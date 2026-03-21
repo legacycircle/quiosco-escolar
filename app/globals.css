@@ -2,25 +2,51 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #16243d;
+  --surface: rgba(255, 255, 255, 0.92);
+  --surface-strong: #ffffff;
+  --line: rgba(22, 36, 61, 0.14);
+  --accent: #d10754;
+  --accent-strong: #d10754;
+  --accent-soft: #f6cddd;
+  --muted: #d0d3d8;
+  --brand-dark: #16243d;
+  --brand-mid: #364a6f;
+  --ink-soft: #364a6f;
+  --shadow: 0 24px 80px rgba(22, 36, 61, 0.12);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-lato);
+  --font-heading: var(--font-poppins);
+  --font-logo: var(--font-comfortaa);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background:
+    radial-gradient(circle at top left, rgba(54, 74, 111, 0.08), transparent 26%),
+    radial-gradient(circle at 80% 18%, rgba(209, 7, 84, 0.08), transparent 24%),
+    linear-gradient(180deg, #ffffff 0%, #fbfbfc 52%, #f7f8fa 100%);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-lato), sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(209, 7, 84, 0.16);
+  color: var(--foreground);
 }
