@@ -1,6 +1,19 @@
-import type { NextRequest } from "next/server";
+﻿import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { getCurrentUserProfile } from "@/lib/supabase/profiles";
 import { createSupabaseRequestClient } from "@/lib/supabase/request";
+
+const protectedPrefixes = [
+  "/wait",
+  "/dashboard",
+  "/gastos",
+  "/ingresos",
+  "/productos",
+  "/proveedores",
+  "/cuentas",
+  "/usuarios",
+  "/mi-cuenta",
+];
 
 function redirectWithCookies(
   request: NextRequest,
@@ -20,11 +33,31 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && pathname.startsWith("/wait")) {
+  const isProtectedRoute = protectedPrefixes.some((prefix) => pathname.startsWith(prefix));
+  const isApprovedOnlyRoute = protectedPrefixes.some(
+    (prefix) => prefix !== "/wait" && pathname.startsWith(prefix)
+  );
+
+  if (!user && isProtectedRoute) {
     return redirectWithCookies(request, "/", applyCookies);
   }
 
-  if (user && (pathname === "/" || pathname === "/signup")) {
+  if (!user) {
+    return applyCookies(NextResponse.next({ request }));
+  }
+
+  const { data: profile } = await getCurrentUserProfile(supabase, user.id);
+  const isApproved = Boolean(profile?.is_approved);
+
+  if (pathname === "/" || pathname === "/signup") {
+    return redirectWithCookies(request, isApproved ? "/dashboard" : "/wait", applyCookies);
+  }
+
+  if (isApproved && pathname.startsWith("/wait")) {
+    return redirectWithCookies(request, "/dashboard", applyCookies);
+  }
+
+  if (!isApproved && isApprovedOnlyRoute) {
     return redirectWithCookies(request, "/wait", applyCookies);
   }
 

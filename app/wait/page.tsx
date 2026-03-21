@@ -1,5 +1,6 @@
 ﻿import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { ApprovalWatcher } from "@/components/auth/approval-watcher";
 import { AuthMessage } from "@/components/auth/auth-form-primitives";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import {
@@ -33,32 +34,28 @@ export default async function WaitPage({ searchParams }: WaitPageProps) {
   const needsSetup = isProfilesTableMissing(error);
   const isApproved = Boolean(profile?.is_approved);
 
+  if (!needsSetup && isApproved) {
+    redirect("/dashboard");
+  }
+
   const title = needsSetup
     ? "Falta terminar la configuración"
-    : isApproved
-      ? "Tu cuenta ya está aprobada"
-      : "Tu cuenta está en revisión";
+    : "Tu cuenta está en revisión";
 
   const description = needsSetup
     ? "El acceso ya funciona, pero todavía falta ejecutar el SQL de perfiles en Supabase para completar el flujo."
-    : isApproved
-      ? "Tu acceso ya quedó habilitado. Esta pantalla será temporal mientras conectamos el panel principal."
-      : "Tu correo ya fue verificado. Ahora solo falta la aprobación manual del owner para entrar al sistema.";
+    : "Tu correo ya fue verificado. Ahora solo falta la aprobación manual del owner para entrar al sistema.";
 
-  const statusLabel = needsSetup
-    ? "Configuración pendiente"
-    : isApproved
-      ? "Aprobada"
-      : "En espera";
+  const statusLabel = needsSetup ? "Configuración pendiente" : "En espera";
 
   const statusToneClasses = needsSetup
     ? "bg-[color:var(--accent-soft)] text-[color:var(--accent)]"
-    : isApproved
-      ? "bg-[rgba(54,74,111,0.12)] text-[color:var(--brand-mid)]"
-      : "bg-[color:var(--accent-soft)] text-[color:var(--accent)]";
+    : "bg-[color:var(--accent-soft)] text-[color:var(--accent)]";
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f7f9fd_100%)] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      {!needsSetup ? <ApprovalWatcher /> : null}
+
       <div className="absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-[rgba(246,205,221,0.45)] blur-3xl" />
       <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-[rgba(54,74,111,0.08)] blur-3xl" />
       <div className="absolute right-0 top-24 h-64 w-64 rounded-full bg-[rgba(208,211,216,0.45)] blur-3xl" />
@@ -147,15 +144,13 @@ export default async function WaitPage({ searchParams }: WaitPageProps) {
                     Siguiente paso
                   </p>
                   <p className="text-sm leading-7 text-[color:var(--brand-dark)] sm:text-[0.98rem]">
-                    {isApproved
-                      ? "En el siguiente paso conectaremos esta cuenta con el panel principal del quiosco."
-                      : "Cuando el owner apruebe tu cuenta, podrás entrar al sistema sin repetir el registro."}
+                    Cuando el owner apruebe tu cuenta, pasarás automáticamente al dashboard.
                   </p>
                 </div>
                 <div className="flex flex-col gap-3 self-stretch sm:items-end">
                   <div className="flex items-center gap-2 self-start rounded-full bg-white px-3 py-2 text-[0.76rem] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-mid)] shadow-[0_8px_20px_rgba(22,36,61,0.04)] sm:self-auto">
                     <span className="h-2.5 w-2.5 rounded-full bg-[color:var(--accent)]" />
-                    {isApproved ? "Lista" : "Pendiente"}
+                    Pendiente
                   </div>
                   <SignOutButton />
                 </div>
