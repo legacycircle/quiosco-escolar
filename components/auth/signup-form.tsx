@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { getSiteUrl } from "@/lib/supabase/config";
+import { getSiteUrl } from "@/lib/supabase/public-env";
 
 type Tone = "danger" | "success";
 
@@ -91,12 +91,13 @@ export function SignupForm() {
 
       void (async () => {
         try {
+          const siteUrl = getSiteUrl();
           const supabase = createSupabaseBrowserClient();
           const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: {
-              emailRedirectTo: `${getSiteUrl()}/auth/callback`,
+              emailRedirectTo: `${siteUrl}/auth/callback`,
               data: {
                 full_name: fullName,
               },
@@ -132,7 +133,7 @@ export function SignupForm() {
             tone: "success",
             title: "Cuenta creada correctamente",
             text: "Revisa tu correo y abre el enlace de verificación para continuar.",
-            detail: `Redirección configurada: ${getSiteUrl()}/auth/callback`,
+            detail: `Redirección configurada: ${siteUrl}/auth/callback`,
           });
         } catch (error) {
           const detail =
