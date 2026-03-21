@@ -93,7 +93,7 @@ export function SignupForm() {
         try {
           const siteUrl = getSiteUrl();
           const supabase = createSupabaseBrowserClient();
-          const { data, error } = await supabase.auth.signUp({
+          const { error } = await supabase.auth.signUp({
             email,
             password,
             options: {
@@ -115,25 +115,11 @@ export function SignupForm() {
             return;
           }
 
-          const identitiesCount = data.user?.identities?.length ?? 0;
-
-          if (!data.user || identitiesCount === 0) {
-            setFeedback({
-              tone: "danger",
-              title: "No pudimos confirmar el alta",
-              text: "Supabase no confirmó una cuenta nueva con ese correo.",
-              detail:
-                "Esto puede pasar si el correo ya existe o si Auth está ocultando el resultado por seguridad.",
-            });
-            return;
-          }
-
           form.reset();
           setFeedback({
             tone: "success",
-            title: "Cuenta creada correctamente",
-            text: "Revisa tu correo y abre el enlace de verificación para continuar.",
-            detail: `Redirección configurada: ${siteUrl}/auth/callback`,
+            title: "Correo de verificación enviado",
+            text: "Hemos enviado un correo de verificación. Ábrelo para activar tu cuenta y continuar.",
           });
         } catch (error) {
           const detail =
