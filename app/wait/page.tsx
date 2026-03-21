@@ -1,51 +1,107 @@
 ﻿import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { AuthMessage } from "@/components/auth/auth-form-primitives";
 import { AuthShell } from "@/components/auth/auth-shell";
+import {
+  getCurrentUserProfile,
+  isProfilesTableMissing,
+} from "@/lib/supabase/profiles";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "En espera",
 };
 
-const steps = [
-  {
-    title: "Cuenta creada",
-    description: "Tu registro quedó preparado dentro del flujo de acceso del quiosco.",
-    status: "Completado",
-  },
-  {
-    title: "Correo verificado",
-    description: "Después de confirmar tu email, la cuenta queda lista para revisión.",
-    status: "Siguiente paso",
-  },
-  {
-    title: "Aprobación manual del owner",
-    description: "Solo cuando el owner autorice el acceso podrás entrar al panel principal.",
-    status: "Pendiente",
-  },
-];
+type WaitPageProps = {
+  searchParams: Promise<{
+    verified?: string;
+  }>;
+};
 
-export default function WaitPage() {
+function buildSteps(isApproved: boolean) {
+  return [
+    {
+      title: "Cuenta creada",
+      description: "Tu registro quedó creado con acceso por correo y contraseña.",
+      status: "Completado",
+    },
+    {
+      title: "Correo verificado",
+      description:
+        "La verificación del email quedó conectada con Supabase y el callback del proyecto.",
+      status: "Completado",
+    },
+    {
+      title: "Aprobación manual del owner",
+      description: isApproved
+        ? "Tu usuario ya fue aprobado. Esta pantalla quedará temporal hasta conectar el panel principal."
+        : "Tu acceso seguirá en espera hasta que el owner apruebe manualmente la cuenta en Supabase.",
+      status: isApproved ? "Aprobado" : "Pendiente",
+    },
+  ];
+}
+
+export default async function WaitPage({ searchParams }: WaitPageProps) {
+  const { verified } = await searchParams;
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/");
+  }
+
+  const { data: profile, error } = await getCurrentUserProfile(supabase, user.id);
+  const needsSetup = isProfilesTableMissing(error);
+  const isApproved = Boolean(profile?.is_approved);
+  const roleLabel = profile?.role === "owner" ? "owner" : "admin";
+  const title = needsSetup
+    ? "Falta terminar la configuración en Supabase."
+    : isApproved
+      ? "Tu cuenta ya está aprobada."
+      : "Tu cuenta está en revisión manual.";
+  const description = needsSetup
+    ? "El login ya funciona, pero todavía falta ejecutar el SQL de perfiles y aprobación manual para completar el flujo."
+    : isApproved
+      ? `Tu acceso como ${roleLabel} ya quedó habilitado. Mientras construimos el panel principal, esta pantalla sirve como punto de entrada temporal.`
+      : "Tu correo ya fue verificado y ahora solo falta la aprobación manual del owner para abrir el resto del sistema.";
+  const steps = buildSteps(isApproved);
+
   return (
     <AuthShell
       badge="Sala de espera"
-      title="Tu cuenta está en revisión manual."
-      description="Esta pantalla será el paso intermedio entre la verificación del email y la aprobación final del owner. Así mantenemos el acceso del quiosco bajo control."
+      title={title}
+      description={description}
       asideLabel="Lo que viene"
-      asideTitle="Mientras el owner aprueba, ya dejamos lista la experiencia del producto."
-      asideDescription="Aquí encaja muy bien el mensaje de espera porque tu sistema tendrá roles claros, una sola propiedad inicial y admins autorizados de forma manual."
+      asideTitle="El acceso del quiosco ya quedó conectado al flujo real."
+      asideDescription="Ahora el registro crea usuarios con email y contraseña, la verificación vuelve por /auth/callback y la aprobación manual queda lista para manejarse desde Supabase."
       metrics={[
         { value: "2", label: "roles del sistema" },
         { value: "Manual", label: "aprobación owner" },
         { value: "100%", label: "email auth" },
       ]}
       highlights={[
-        "Owner único para control inicial del negocio.",
-        "Admins con acceso según aprobación.",
-        "Próximo paso: conectar Supabase y reglas de autorización.",
+        "Owner único definido una sola vez desde Supabase.",
+        "Admins creados por signup con aprobación manual.",
+        "Callback de verificación conectado a Supabase.",
         "Después: dashboard, productos, ventas, gastos y reportes.",
       ]}
     >
       <div className="space-y-6">
+        {verified === "1" ? (
+          <AuthMessage tone="success">
+            Tu correo fue verificado correctamente. Ya puedes esperar la aprobación del owner.
+          </AuthMessage>
+        ) : null}
+
+        {needsSetup ? (
+          <AuthMessage tone="danger">
+            Ejecuta el SQL de <span className="font-semibold">supabase/schema.sql</span> en tu proyecto de Supabase para crear la tabla de perfiles y las reglas de acceso.
+          </AuthMessage>
+        ) : null}
+
         <div className="rounded-[1.75rem] border border-[color:var(--line)] bg-[color:var(--surface-strong)] p-5 shadow-[0_14px_35px_rgba(22,36,61,0.08)]">
           <div className="space-y-4">
             {steps.map((step, index) => (
@@ -76,8 +132,11 @@ export default function WaitPage() {
 
         <div className="rounded-[1.75rem] border border-dashed border-[color:var(--line)] bg-white/65 p-5">
           <p className="text-sm leading-6 text-[color:var(--ink-soft)]">
-            Cuando conectemos Supabase, esta vista será el destino real después
-            de verificar el correo.
+            {needsSetup
+              ? "Después de ejecutar el SQL, esta vista leerá el estado real de aprobación desde Supabase."
+              : isApproved
+                ? "Cuando el dashboard exista, los usuarios aprobados podrán salir de esta pantalla hacia el panel principal."
+                : "Mientras no exista aprobación, esta vista se mantendrá como el destino real después de verificar el correo."}
           </p>
         </div>
 

@@ -5,7 +5,15 @@ export const metadata: Metadata = {
   title: "Acceso",
 };
 
-export default function Home() {
+type HomeProps = {
+  searchParams: Promise<{
+    error?: string;
+  }>;
+};
+
+export default async function Home({ searchParams }: HomeProps) {
+  const { error } = await searchParams;
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-[color:var(--muted)]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.96),_rgba(208,211,216,0.9)_44%,_rgba(22,36,61,0.78)_100%)]" />
@@ -22,7 +30,7 @@ export default function Home() {
             </p>
           </div>
 
-          <LoginPanel />
+          <LoginPanel initialError={error} />
         </section>
       </div>
     </main>

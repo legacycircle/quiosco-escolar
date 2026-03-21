@@ -1,14 +1,24 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { AuthMessage } from "@/components/auth/auth-form-primitives";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { getSiteUrl } from "@/lib/supabase/config";
 
-type Tone = "danger";
+type Tone = "danger" | "success";
+
+function formatSignupError(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("user already registered")) {
+    return "Ese correo ya está registrado. Intenta iniciar sesión.";
+  }
+
+  return message;
+}
 
 export function SignupForm() {
-  const router = useRouter();
   const [message, setMessage] = useState<{ text: string; tone: Tone } | null>(
     null
   );
@@ -17,7 +27,8 @@ export function SignupForm() {
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const fullName = String(formData.get("fullName") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
@@ -40,7 +51,34 @@ export function SignupForm() {
 
     startTransition(() => {
       setMessage(null);
-      router.push("/wait");
+
+      void (async () => {
+        const supabase = createSupabaseBrowserClient();
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${getSiteUrl()}/auth/callback`,
+            data: {
+              full_name: fullName,
+            },
+          },
+        });
+
+        if (error) {
+          setMessage({
+            text: formatSignupError(error.message),
+            tone: "danger",
+          });
+          return;
+        }
+
+        form.reset();
+        setMessage({
+          text: "Revisa tu correo para verificar la cuenta y continuar.",
+          tone: "success",
+        });
+      })();
     });
   };
 
@@ -48,7 +86,9 @@ export function SignupForm() {
     <div className="space-y-8">
       <form className="space-y-6" onSubmit={handleSubmit}>
         <label className="block space-y-2" htmlFor="fullName">
-          <span className="text-[1.02rem] font-medium text-[color:var(--brand-dark)]">Nombre</span>
+          <span className="text-[1.02rem] font-medium text-[color:var(--brand-dark)]">
+            Nombre
+          </span>
           <input
             id="fullName"
             name="fullName"
@@ -61,7 +101,9 @@ export function SignupForm() {
         </label>
 
         <label className="block space-y-2" htmlFor="email">
-          <span className="text-[1.02rem] font-medium text-[color:var(--brand-dark)]">Correo</span>
+          <span className="text-[1.02rem] font-medium text-[color:var(--brand-dark)]">
+            Correo
+          </span>
           <input
             id="email"
             name="email"
@@ -74,7 +116,9 @@ export function SignupForm() {
         </label>
 
         <label className="block space-y-2" htmlFor="password">
-          <span className="text-[1.02rem] font-medium text-[color:var(--brand-dark)]">Contraseña</span>
+          <span className="text-[1.02rem] font-medium text-[color:var(--brand-dark)]">
+            Contraseña
+          </span>
           <input
             id="password"
             name="password"
@@ -92,15 +136,18 @@ export function SignupForm() {
           disabled={isPending}
           className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[color:var(--brand-dark)] px-5 text-[1.08rem] font-semibold text-white transition hover:bg-[color:var(--brand-mid)] disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {isPending ? "Creando..." : "Crear cuenta"}
+          {isPending ? "Creando cuenta..." : "Crear cuenta"}
         </button>
       </form>
 
       {message ? <AuthMessage tone={message.tone}>{message.text}</AuthMessage> : null}
 
       <p className="text-center text-[1.02rem] text-[color:var(--brand-mid)]">
-        Ya tienes una cuenta? {" "}
-        <Link href="/" className="font-semibold text-[color:var(--brand-dark)] hover:text-[color:var(--accent)]">
+        Ya tienes una cuenta?{" "}
+        <Link
+          href="/"
+          className="font-semibold text-[color:var(--brand-dark)] hover:text-[color:var(--accent)]"
+        >
           Inicia sesión
         </Link>
       </p>
