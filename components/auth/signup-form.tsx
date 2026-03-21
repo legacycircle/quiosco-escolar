@@ -2,26 +2,59 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { AuthMessage } from "@/components/auth/auth-form-primitives";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { getSiteUrl } from "@/lib/supabase/config";
 
 type Tone = "danger" | "success";
 
+type Feedback = {
+  tone: Tone;
+  title: string;
+  text: string;
+  detail?: string;
+};
+
+function buildValidationFeedback(text: string, detail?: string): Feedback {
+  return {
+    tone: "danger",
+    title: "No se pudo crear la cuenta",
+    text,
+    detail,
+  };
+}
+
 function formatSignupError(message: string) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("user already registered")) {
-    return "Ese correo ya está registrado. Intenta iniciar sesión.";
+    return {
+      text: "Ese correo ya está registrado. Intenta iniciar sesión.",
+      detail: message,
+    };
   }
 
-  return message;
+  if (normalized.includes("database error saving new user")) {
+    return {
+      text: "Supabase no pudo guardar el usuario nuevo.",
+      detail: message,
+    };
+  }
+
+  if (normalized.includes("redirect url") || normalized.includes("redirect_to")) {
+    return {
+      text: "La URL de redirección de verificación no coincide con la configuración de Supabase.",
+      detail: message,
+    };
+  }
+
+  return {
+    text: "Supabase devolvió un error al crear la cuenta.",
+    detail: message,
+  };
 }
 
 export function SignupForm() {
-  const [message, setMessage] = useState<{ text: string; tone: Tone } | null>(
-    null
-  );
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -34,50 +67,84 @@ export function SignupForm() {
     const password = String(formData.get("password") ?? "");
 
     if (!fullName || !email) {
-      setMessage({
-        text: "Completa los campos obligatorios.",
-        tone: "danger",
-      });
+      setFeedback(
+        buildValidationFeedback(
+          "Completa los campos obligatorios.",
+          "Faltan nombre o correo."
+        )
+      );
       return;
     }
 
     if (password.length < 8) {
-      setMessage({
-        text: "La contraseña debe tener al menos 8 caracteres.",
-        tone: "danger",
-      });
+      setFeedback(
+        buildValidationFeedback(
+          "La contraseña debe tener al menos 8 caracteres.",
+          `Longitud actual: ${password.length}`
+        )
+      );
       return;
     }
 
     startTransition(() => {
-      setMessage(null);
+      setFeedback(null);
 
       void (async () => {
-        const supabase = createSupabaseBrowserClient();
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${getSiteUrl()}/auth/callback`,
-            data: {
-              full_name: fullName,
+        try {
+          const supabase = createSupabaseBrowserClient();
+          const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${getSiteUrl()}/auth/callback`,
+              data: {
+                full_name: fullName,
+              },
             },
-          },
-        });
-
-        if (error) {
-          setMessage({
-            text: formatSignupError(error.message),
-            tone: "danger",
           });
-          return;
-        }
 
-        form.reset();
-        setMessage({
-          text: "Revisa tu correo para verificar la cuenta y continuar.",
-          tone: "success",
-        });
+          if (error) {
+            const parsed = formatSignupError(error.message);
+            setFeedback({
+              tone: "danger",
+              title: "No se pudo crear la cuenta",
+              text: parsed.text,
+              detail: parsed.detail,
+            });
+            return;
+          }
+
+          const identitiesCount = data.user?.identities?.length ?? 0;
+
+          if (!data.user || identitiesCount === 0) {
+            setFeedback({
+              tone: "danger",
+              title: "No pudimos confirmar el alta",
+              text: "Supabase no confirmó una cuenta nueva con ese correo.",
+              detail:
+                "Esto puede pasar si el correo ya existe o si Auth está ocultando el resultado por seguridad.",
+            });
+            return;
+          }
+
+          form.reset();
+          setFeedback({
+            tone: "success",
+            title: "Cuenta creada correctamente",
+            text: "Revisa tu correo y abre el enlace de verificación para continuar.",
+            detail: `Redirección configurada: ${getSiteUrl()}/auth/callback`,
+          });
+        } catch (error) {
+          const detail =
+            error instanceof Error ? error.message : "Error inesperado no identificado.";
+
+          setFeedback({
+            tone: "danger",
+            title: "Falló el registro",
+            text: "El sistema lanzó una excepción al intentar crear la cuenta.",
+            detail,
+          });
+        }
       })();
     });
   };
@@ -140,7 +207,24 @@ export function SignupForm() {
         </button>
       </form>
 
-      {message ? <AuthMessage tone={message.tone}>{message.text}</AuthMessage> : null}
+      {feedback ? (
+        <div
+          className={[
+            "rounded-2xl border px-4 py-4 text-sm leading-6",
+            feedback.tone === "success"
+              ? "border-[color:var(--accent-soft)] bg-[color:var(--accent-soft)]/30 text-[color:var(--brand-dark)]"
+              : "border-[color:var(--accent)]/22 bg-[color:var(--accent-soft)]/42 text-[color:var(--brand-dark)]",
+          ].join(" ")}
+        >
+          <p className="font-semibold text-[color:var(--brand-dark)]">{feedback.title}</p>
+          <p className="mt-1">{feedback.text}</p>
+          {feedback.detail ? (
+            <p className="mt-2 rounded-xl bg-white/70 px-3 py-2 text-xs leading-5 text-[color:var(--brand-mid)] break-words">
+              {feedback.detail}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <p className="text-center text-[1.02rem] text-[color:var(--brand-mid)]">
         Ya tienes una cuenta?{" "}
