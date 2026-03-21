@@ -188,9 +188,10 @@ export function SignupForm() {
         <button
           type="submit"
           disabled={isPending}
-          className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[color:var(--brand-dark)] px-5 text-[1.08rem] font-semibold text-white transition hover:bg-[color:var(--brand-mid)] disabled:cursor-not-allowed disabled:opacity-70"
+          aria-busy={isPending}
+          className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[color:var(--brand-dark)] px-5 text-[1.08rem] font-semibold text-white transition hover:bg-[color:var(--brand-mid)] disabled:cursor-not-allowed disabled:opacity-80"
         >
-          {isPending ? "Creando cuenta..." : "Crear cuenta"}
+          Crear cuenta
         </button>
       </form>
 
