@@ -143,6 +143,24 @@ function FeedbackBanner({ feedback }: { feedback: Feedback }) {
   );
 }
 
+function PencilIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+    </svg>
+  );
+}
+
 function TrashIcon() {
   return (
     <svg
@@ -223,6 +241,14 @@ export function ProductsTable({
   }, [editState]);
 
   const closeModal = () => setEditState(null);
+
+  const openEdit = (product: ProductRecord) => {
+    setEditState({
+      id: product.id,
+      nombre: product.nombre,
+      precioVenta: product.precio_venta == null ? "" : String(product.precio_venta),
+    });
+  };
 
   const handleSave = () => {
     if (!editState) {
@@ -412,7 +438,19 @@ export function ProductsTable({
                       <td className="px-4 py-1.5 font-semibold">{product.nombre}</td>
                       <td className="px-4 py-1.5">Producto</td>
                       <td className="px-4 py-1.5">{product.categoria}</td>
-                      <td className="px-4 py-1.5 text-right">{formatCurrency(product.precio_venta)}</td>
+                      <td className="px-4 py-1.5 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <span>{formatCurrency(product.precio_venta)}</span>
+                          <button
+                            type="button"
+                            aria-label={`Editar precio de venta de ${product.nombre}`}
+                            onClick={() => openEdit(product)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#eadcd2] bg-white text-[color:var(--brand-dark)] transition hover:border-[color:var(--brand-mid)] hover:text-[color:var(--brand-mid)]"
+                          >
+                            <PencilIcon />
+                          </button>
+                        </div>
+                      </td>
                       <td className="px-4 py-1.5 text-right">{formatCurrency(product.costo_unitario)}</td>
                       <td className="px-4 py-1.5 text-right font-semibold">{product.stock}</td>
                       <td className="px-4 py-1.5 text-right">{quantitySold}</td>
@@ -420,20 +458,6 @@ export function ProductsTable({
                       <td className="px-4 py-1.5 text-right">{formatShortDate(product.created_at)}</td>
                       <td className="px-4 py-1.5 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setEditState({
-                                id: product.id,
-                                nombre: product.nombre,
-                                precioVenta:
-                                  product.precio_venta == null ? "" : String(product.precio_venta),
-                              })
-                            }
-                            className="inline-flex min-h-8 items-center justify-center rounded-full border border-[#eadcd2] bg-white px-3 text-xs font-semibold text-[color:var(--brand-dark)] transition hover:border-[color:var(--brand-mid)]"
-                          >
-                            Editar
-                          </button>
                           <button
                             type="button"
                             aria-label={`Borrar ${product.nombre}`}
@@ -483,18 +507,18 @@ export function ProductsTable({
           Página {currentPage} de {totalPages}
         </p>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <Link
             href={currentPage > 1 ? `/productos?page=${currentPage - 1}` : "/productos?page=1"}
             aria-disabled={currentPage <= 1}
             className={[
-              "inline-flex min-h-11 items-center justify-center rounded-full border px-4 text-sm font-semibold transition",
+              "inline-flex min-h-11 min-w-[7.6rem] items-center justify-center rounded-full border px-5 text-sm font-semibold transition",
               currentPage <= 1
-                ? "pointer-events-none border-[#eee3db] bg-[#f8f4f1] text-[#b9a89b]"
-                : "border-[#eadcd2] bg-white text-[color:var(--brand-dark)] hover:border-[color:var(--brand-mid)]",
+                ? "pointer-events-none border-[#eadcd2] bg-transparent text-[color:var(--brand-dark)] visited:text-[color:var(--brand-dark)]"
+                : "border-[#eadcd2] bg-transparent text-[color:var(--brand-dark)] visited:text-[color:var(--brand-dark)] hover:border-[color:var(--brand-mid)]",
             ].join(" ")}
           >
-            Anterior
+            <span className="font-semibold text-inherit">Anterior</span>
           </Link>
           <Link
             href={
@@ -504,13 +528,13 @@ export function ProductsTable({
             }
             aria-disabled={currentPage >= totalPages}
             className={[
-              "inline-flex min-h-11 items-center justify-center rounded-full border px-4 text-sm font-semibold transition",
+              "inline-flex min-h-11 min-w-[8.4rem] items-center justify-center rounded-full border px-5 text-sm font-semibold transition",
               currentPage >= totalPages
-                ? "pointer-events-none border-[#eee3db] bg-[#f8f4f1] text-[#b9a89b]"
-                : "border-[color:var(--brand-dark)] bg-[color:var(--brand-dark)] text-white hover:opacity-92",
+                ? "pointer-events-none border-[#eadcd2] bg-transparent text-[color:var(--brand-dark)] visited:text-[color:var(--brand-dark)]"
+                : "border-[color:var(--brand-dark)] bg-[color:var(--brand-dark)] !text-white visited:!text-white hover:!text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:opacity-92",
             ].join(" ")}
           >
-            Siguiente
+            <span className="font-semibold text-inherit">Siguiente</span>
           </Link>
         </div>
       </div>
@@ -600,3 +624,8 @@ export function ProductsTable({
     </section>
   );
 }
+
+
+
+
+
