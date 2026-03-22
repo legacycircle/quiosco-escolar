@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Comfortaa, Lato, Poppins } from "next/font/google";
 import "./globals.css";
 
@@ -22,11 +22,15 @@ const comfortaa = Comfortaa({
 
 export const metadata: Metadata = {
   title: {
-    default: "QUIOSCO",
-    template: "%s | QUIOSCO",
+    default: "OMNI AGENCIA",
+    template: "%s | OMNI AGENCIA",
   },
-  description:
-    "Gestiona ventas, gastos, inventario y rentabilidad de tu quiosco escolar desde una sola plataforma.",
+  description: "Sistema de control de gastos y ventas del quiosco escolar.",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
