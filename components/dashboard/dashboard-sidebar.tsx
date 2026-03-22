@@ -1,9 +1,9 @@
 ﻿import Link from "next/link";
-import { SignOutButton } from "@/components/auth/sign-out-button";
 
 type DashboardSidebarProps = {
   userLabel: string;
   roleLabel: string;
+  activeLabel: string;
 };
 
 type IconName =
@@ -17,23 +17,23 @@ type IconName =
 
 type MenuItem = {
   label: string;
+  href: string;
   icon: IconName;
-  active?: boolean;
 };
 
 const menuItems: MenuItem[] = [
-  { label: "Dashboard", icon: "dashboard", active: true },
-  { label: "Gastos", icon: "gastos" },
-  { label: "Ingresos", icon: "ingresos" },
-  { label: "Productos", icon: "productos" },
-  { label: "Proveedores", icon: "proveedores" },
-  { label: "Cuentas bancarias", icon: "bancos" },
-  { label: "Usuarios", icon: "usuarios" },
+  { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
+  { label: "Gastos", href: "/gastos", icon: "gastos" },
+  { label: "Ingresos", href: "/ingresos", icon: "ingresos" },
+  { label: "Productos", href: "/productos", icon: "productos" },
+  { label: "Proveedores", href: "/proveedores", icon: "proveedores" },
+  { label: "Cuentas", href: "/cuentas", icon: "bancos" },
+  { label: "Usuarios", href: "/usuarios", icon: "usuarios" },
 ];
 
 function SidebarIcon({ name }: { name: IconName }) {
   const commonProps = {
-    className: "h-[1.05rem] w-[1.05rem] shrink-0",
+    className: "h-[1.02rem] w-[1.02rem] shrink-0",
     fill: "none",
     stroke: "currentColor",
     strokeWidth: 1.9,
@@ -103,58 +103,70 @@ function SidebarIcon({ name }: { name: IconName }) {
   }
 }
 
-export function DashboardSidebar({ userLabel, roleLabel }: DashboardSidebarProps) {
+function AccountArrow() {
+  return (
+    <svg
+      className="h-[1.02rem] w-[1.02rem] shrink-0 text-[color:var(--brand-mid)]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      viewBox="0 0 24 24"
+    >
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+export function DashboardSidebar({ userLabel, roleLabel, activeLabel }: DashboardSidebarProps) {
   const initial = userLabel.charAt(0).toUpperCase() || "Q";
 
   return (
-    <aside className="border-b border-[color:var(--line)] bg-white lg:min-h-screen lg:border-b-0 lg:border-r">
-      <div className="flex h-full flex-col gap-6 p-4 sm:p-5 lg:p-6">
-        <div className="space-y-5">
-          <div className="space-y-3">
-            <div className="font-logo text-[2.7rem] leading-none tracking-[0.08em] text-[color:var(--brand-dark)]">
+    <aside className="hidden w-[228px] shrink-0 border-r border-[#eadcd2] bg-white lg:flex lg:min-h-screen">
+      <div className="flex h-screen w-full flex-col px-3 py-6">
+        <div className="px-5 pt-0.5">
+          <Link href="/dashboard" className="block">
+            <div className="font-heading text-[1.55rem] font-semibold leading-none tracking-[0.14em] text-[color:var(--brand-dark)]">
               QUIOSCO
             </div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--brand-mid)]">
-              Principal
-            </p>
-          </div>
-
-          <nav className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
-            {menuItems.map((item) => {
-              const itemClassName = item.active
-                ? "border-transparent bg-[#f2e5dc] text-[color:var(--brand-dark)] shadow-[0_8px_20px_rgba(22,36,61,0.05)]"
-                : "border-transparent bg-transparent text-[color:var(--brand-mid)] hover:bg-[#faf6f2]";
-
-              const content = (
-                <span
-                  className={[
-                    "flex min-h-12 items-center gap-3 rounded-2xl border px-3.5 py-3 text-[0.98rem] font-semibold transition",
-                    itemClassName,
-                  ].join(" ")}
-                >
-                  <SidebarIcon name={item.icon} />
-                  <span>{item.label}</span>
-                </span>
-              );
-
-              return item.active ? (
-                <Link key={item.label} href="/dashboard">
-                  {content}
-                </Link>
-              ) : (
-                <div key={item.label}>{content}</div>
-              );
-            })}
-          </nav>
+          </Link>
+          <p className="mt-6 text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--brand-mid)]">
+            Principal
+          </p>
         </div>
 
-        <div className="mt-1 border-t border-[color:var(--line)] pt-5 lg:mt-auto">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--brand-mid)]">
+        <nav className="mt-3 space-y-1 px-2">
+          {menuItems.map((item) => {
+            const isActive = item.label === activeLabel;
+
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={[
+                  "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[1rem] font-medium transition",
+                  isActive
+                    ? "bg-[#f1e4db] text-[color:var(--brand-dark)]"
+                    : "text-[color:var(--brand-dark)] hover:bg-[#faf6f2]",
+                ].join(" ")}
+              >
+                <SidebarIcon name={item.icon} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="mt-auto border-t border-[#eadcd2] px-4 pt-4">
+          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-[color:var(--brand-mid)]">
             Cuenta
           </p>
-          <div className="mt-3 space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-[#fcf8f5] p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#edd8cc] text-sm font-bold text-[color:var(--brand-dark)]">
+
+          <Link
+            href="/mi-cuenta"
+            className="mt-3 flex items-center justify-between gap-3 rounded-[1.1rem] border border-[#eadcd2] bg-[#fcf8f5] px-3 py-3 transition hover:border-[#dbc8bb]"
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#edd8cc] text-sm font-bold text-[color:var(--brand-dark)]">
                 {initial}
               </div>
               <div className="min-w-0">
@@ -166,8 +178,9 @@ export function DashboardSidebar({ userLabel, roleLabel }: DashboardSidebarProps
                 </p>
               </div>
             </div>
-            <SignOutButton fullWidth />
-          </div>
+
+            <AccountArrow />
+          </Link>
         </div>
       </div>
     </aside>
