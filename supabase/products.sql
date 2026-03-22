@@ -21,6 +21,7 @@ create table if not exists public.products (
   costo_unitario numeric(16,8) not null check (costo_unitario >= 0),
   precio_venta numeric(16,8) check (precio_venta is null or precio_venta >= 0),
   stock integer not null default 0 check (stock >= 0),
+  total_comprado integer not null default 0 check (total_comprado >= 0),
   is_active boolean not null default true,
   created_by uuid not null default auth.uid() references public.profiles(id),
   created_at timestamptz not null default timezone('utc', now()),
@@ -78,4 +79,7 @@ to authenticated
 using (public.is_approved_user());
 
 comment on table public.products is
-'Productos del quiosco escolar con categoria, costo, precio opcional y stock.';
+'Productos del quiosco escolar con categoria, costo, precio opcional, stock actual y total comprado.';
+
+
+

@@ -7,6 +7,7 @@ export type ProductRecord = {
   costo_unitario: number;
   precio_venta: number | null;
   stock: number;
+  total_comprado: number;
   is_active: boolean;
   created_at: string;
 };
@@ -17,6 +18,7 @@ export type ProductOption = {
   categoria: string;
   precio_venta: number | null;
   stock: number;
+  total_comprado: number;
   is_active: boolean;
 };
 
@@ -83,7 +85,7 @@ export async function getProductsPage(
   const response = await supabase
     .from("products")
     .select(
-      "id, nombre, categoria, costo_unitario, precio_venta, stock, is_active, created_at",
+      "id, nombre, categoria, costo_unitario, precio_venta, stock, total_comprado, is_active, created_at",
       { count: "exact" }
     )
     .order("created_at", { ascending: false })
@@ -222,7 +224,7 @@ export async function getAllProductOptions(
 ): Promise<{ items: ProductOption[]; tableMissing: boolean }> {
   const response = await supabase
     .from("products")
-    .select("id, nombre, categoria, precio_venta, stock, is_active")
+    .select("id, nombre, categoria, precio_venta, stock, total_comprado, is_active")
     .order("nombre", { ascending: true });
 
   const typedResponse = response as PostgrestSingleResponse<ProductOption[]>;

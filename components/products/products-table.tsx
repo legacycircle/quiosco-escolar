@@ -36,12 +36,7 @@ type EditState = {
 } | null;
 
 function buildFeedback(title: string, text: string, detail?: string, tone: Tone = "danger") {
-  return {
-    tone,
-    title,
-    text,
-    detail,
-  } satisfies Feedback;
+  return { tone, title, text, detail } satisfies Feedback;
 }
 
 function isMissingRelationError(code?: string | null) {
@@ -52,37 +47,21 @@ function formatSaveError(message: string) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("relation") && normalized.includes("products")) {
-    return buildFeedback(
-      "Tabla pendiente",
-      "La tabla products todavía no existe en Supabase.",
-      message
-    );
+    return buildFeedback("Tabla pendiente", "La tabla products todavía no existe en Supabase.", message);
   }
 
   if (normalized.includes("row-level security") || normalized.includes("permission denied")) {
-    return buildFeedback(
-      "Sin permisos",
-      "Tu cuenta no tiene permisos para editar productos.",
-      message
-    );
+    return buildFeedback("Sin permisos", "Tu cuenta no tiene permisos para editar productos.", message);
   }
 
-  return buildFeedback(
-    "No se pudo guardar",
-    "Supabase devolvió un error al actualizar el producto.",
-    message
-  );
+  return buildFeedback("No se pudo guardar", "Supabase devolvió un error al actualizar el producto.", message);
 }
 
 function formatDeleteError(message: string) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("relation") && normalized.includes("products")) {
-    return buildFeedback(
-      "Tabla pendiente",
-      "La tabla products todavía no existe en Supabase.",
-      message
-    );
+    return buildFeedback("Tabla pendiente", "La tabla products todavía no existe en Supabase.", message);
   }
 
   if (normalized.includes("row-level security") || normalized.includes("permission denied")) {
@@ -110,6 +89,13 @@ function formatCurrency(value: number | null) {
     currency: "PEN",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatPercentage(value: number) {
+  return new Intl.NumberFormat("es-PE", {
+    minimumFractionDigits: value % 1 === 0 ? 0 : 1,
+    maximumFractionDigits: 1,
   }).format(value);
 }
 
@@ -145,16 +131,7 @@ function FeedbackBanner({ feedback }: { feedback: Feedback }) {
 
 function PencilIcon() {
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 20h9" />
       <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
     </svg>
@@ -163,16 +140,7 @@ function PencilIcon() {
 
 function TrashIcon() {
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 6h18" />
       <path d="M8 6V4.8c0-.44.36-.8.8-.8h6.4c.44 0 .8.36.8.8V6" />
       <path d="M6.8 6l.73 11.03A2 2 0 0 0 9.52 19h4.96a2 2 0 0 0 1.99-1.97L17.2 6" />
@@ -184,30 +152,18 @@ function TrashIcon() {
 
 async function getRegisteredSalesCount(productId: number) {
   const supabase = createSupabaseBrowserClient();
-  const response = await supabase
-    .from("sale_items")
-    .select("id", { count: "exact", head: true })
-    .eq("product_id", productId);
-
-  const typedResponse = response as PostgrestSingleResponse<null> & {
-    count: number | null;
-  };
+  const response = await supabase.from("sale_items").select("id", { count: "exact", head: true }).eq("product_id", productId);
+  const typedResponse = response as PostgrestSingleResponse<null> & { count: number | null };
 
   if (isMissingRelationError(typedResponse.error?.code)) {
-    return {
-      count: 0,
-      tableMissing: true,
-    };
+    return { count: 0, tableMissing: true };
   }
 
   if (typedResponse.error) {
     throw typedResponse.error;
   }
 
-  return {
-    count: typedResponse.count ?? 0,
-    tableMissing: false,
-  };
+  return { count: typedResponse.count ?? 0, tableMissing: false };
 }
 
 export function ProductsTable({
@@ -228,9 +184,7 @@ export function ProductsTable({
   const emptyRows = Array.from({ length: pageSize }, (_, index) => index);
 
   useEffect(() => {
-    if (!editState) {
-      return;
-    }
+    if (!editState) return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -251,9 +205,7 @@ export function ProductsTable({
   };
 
   const handleSave = () => {
-    if (!editState) {
-      return;
-    }
+    if (!editState) return;
 
     const nombre = editState.nombre.trim();
     const precioVenta = editState.precioVenta.trim();
@@ -266,12 +218,7 @@ export function ProductsTable({
     const parsedSalePriceValue = normalizeOptionalDecimalString(precioVenta);
 
     if (precioVenta && parsedSalePriceValue == null) {
-      setFeedback(
-        buildFeedback(
-          "Precio inválido",
-          "El precio de venta debe ser un número válido o quedar vacío."
-        )
-      );
+      setFeedback(buildFeedback("Precio inválido", "El precio de venta debe ser un número válido o quedar vacío."));
       return;
     }
 
@@ -281,13 +228,7 @@ export function ProductsTable({
       void (async () => {
         try {
           const supabase = createSupabaseBrowserClient();
-          const { error } = await supabase
-            .from("products")
-            .update({
-              nombre,
-              precio_venta: parsedSalePriceValue,
-            })
-            .eq("id", editState.id);
+          const { error } = await supabase.from("products").update({ nombre, precio_venta: parsedSalePriceValue }).eq("id", editState.id);
 
           if (error) {
             setFeedback(formatSaveError(error.message));
@@ -295,14 +236,7 @@ export function ProductsTable({
           }
 
           closeModal();
-          setFeedback(
-            buildFeedback(
-              "Producto actualizado",
-              "Los cambios se guardaron correctamente.",
-              undefined,
-              "success"
-            )
-          );
+          setFeedback(buildFeedback("Producto actualizado", "Los cambios se guardaron correctamente.", undefined, "success"));
           router.refresh();
         } catch (error) {
           const detail = error instanceof Error ? error.message : "Error inesperado no identificado.";
@@ -319,16 +253,12 @@ export function ProductsTable({
       void (async () => {
         try {
           const { count, tableMissing: salesTableMissing } = await getRegisteredSalesCount(product.id);
-          const hasSales = count > 0;
-          const shouldDelete = !hasSales;
-
+          const shouldDelete = count <= 0;
           const confirmText = shouldDelete
             ? `¿Deseas borrar ${product.nombre}? Esta acción no se puede deshacer.`
             : `"${product.nombre}" ya tiene ventas registradas. Solo podrá quedar inactivo. ¿Deseas continuar?`;
 
-          if (!window.confirm(confirmText)) {
-            return;
-          }
+          if (!window.confirm(confirmText)) return;
 
           const supabase = createSupabaseBrowserClient();
 
@@ -354,34 +284,18 @@ export function ProductsTable({
             return;
           }
 
-          const { error } = await supabase
-            .from("products")
-            .update({ is_active: false })
-            .eq("id", product.id);
+          const { error } = await supabase.from("products").update({ is_active: false }).eq("id", product.id);
 
           if (error) {
             setFeedback(formatDeleteError(error.message));
             return;
           }
 
-          setFeedback(
-            buildFeedback(
-              "Producto inactivo",
-              "El producto quedó inactivo porque ya tiene ventas registradas.",
-              undefined,
-              "success"
-            )
-          );
+          setFeedback(buildFeedback("Producto inactivo", "El producto quedó inactivo porque ya tiene ventas registradas.", undefined, "success"));
           router.refresh();
         } catch (error) {
           const detail = error instanceof Error ? error.message : "Error inesperado no identificado.";
-          setFeedback(
-            buildFeedback(
-              "No se pudo completar la acción",
-              "No se pudo borrar o inactivar el producto.",
-              detail
-            )
-          );
+          setFeedback(buildFeedback("No se pudo completar la acción", "No se pudo borrar o inactivar el producto.", detail));
         }
       })();
     });
@@ -390,15 +304,9 @@ export function ProductsTable({
   return (
     <section className="rounded-[2rem] border border-[#eadcd2] bg-white p-4 shadow-[0_18px_40px_rgba(22,36,61,0.06)] sm:p-5 lg:rounded-[1.8rem]">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="font-heading text-[1.9rem] font-bold tracking-[-0.04em] text-[color:var(--brand-dark)]">
-          Productos
-        </h2>
+        <h2 className="font-heading text-[1.9rem] font-bold tracking-[-0.04em] text-[color:var(--brand-dark)]">Productos</h2>
         <p className="text-sm text-[color:var(--brand-mid)]">
-          {tableMissing
-            ? "Tabla products pendiente en Supabase"
-            : totalCount === 0
-              ? "Sin productos registrados"
-              : `${firstItem}-${lastItem} de ${totalCount}`}
+          {tableMissing ? "Tabla products pendiente en Supabase" : totalCount === 0 ? "Sin productos registrados" : `${firstItem}-${lastItem} de ${totalCount}`}
         </p>
       </div>
 
@@ -406,17 +314,18 @@ export function ProductsTable({
 
       <div className="mt-4 overflow-hidden rounded-[1.25rem] border border-[#eadcd2] bg-[#fffdfa]">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1240px] border-collapse">
+          <table className="w-full min-w-[1380px] border-collapse">
             <thead>
               <tr className="bg-[#f6ede7] text-left text-[0.88rem] font-semibold text-[color:var(--brand-dark)]">
                 <th className="px-4 py-1.5">Nombre</th>
-                <th className="px-4 py-1.5">Tipo</th>
-                <th className="px-4 py-1.5">Categoría</th>
                 <th className="px-4 py-1.5 text-right">Precio</th>
                 <th className="px-4 py-1.5 text-right">Costo base</th>
-                <th className="px-4 py-1.5 text-right">Stock</th>
-                <th className="px-4 py-1.5 text-right">Nro ventas</th>
+                <th className="px-4 py-1.5 text-right">Comprado</th>
+                <th className="px-4 py-1.5 text-right">Quedan</th>
+                <th className="px-4 py-1.5 text-right">Inversión</th>
                 <th className="px-4 py-1.5 text-right">Total ventas</th>
+                <th className="px-4 py-1.5 text-right">Margen estimado</th>
+                <th className="px-4 py-1.5 text-right">% vendido</th>
                 <th className="px-4 py-1.5 text-right">Fecha</th>
                 <th className="px-4 py-1.5 text-right">Acciones</th>
               </tr>
@@ -427,17 +336,17 @@ export function ProductsTable({
 
                 if (product) {
                   const salesSummary = salesByProduct[product.id];
-                  const quantitySold = salesSummary?.quantitySold ?? 0;
                   const totalSales = salesSummary?.totalSales ?? 0;
+                  const soldInvestment = salesSummary?.soldInvestment ?? 0;
+                  const visibleInvestment = product.total_comprado * product.costo_unitario;
+                  const currentInvestment = product.stock * product.costo_unitario;
+                  const soldInvestmentBase = soldInvestment + currentInvestment;
+                  const soldPercentage = soldInvestmentBase > 0 ? (soldInvestment / soldInvestmentBase) * 100 : 0;
+                  const estimatedMargin = product.precio_venta == null ? null : (product.precio_venta - product.costo_unitario) * product.stock;
 
                   return (
-                    <tr
-                      key={product.id}
-                      className="border-t border-[#f1e4db] bg-white text-[0.92rem] text-[color:var(--brand-dark)]"
-                    >
+                    <tr key={product.id} className="border-t border-[#f1e4db] bg-white text-[0.92rem] text-[color:var(--brand-dark)]">
                       <td className="px-4 py-1.5 font-semibold">{product.nombre}</td>
-                      <td className="px-4 py-1.5">Producto</td>
-                      <td className="px-4 py-1.5">{product.categoria}</td>
                       <td className="px-4 py-1.5 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <span>{formatCurrency(product.precio_venta)}</span>
@@ -452,9 +361,12 @@ export function ProductsTable({
                         </div>
                       </td>
                       <td className="px-4 py-1.5 text-right">{formatCurrency(product.costo_unitario)}</td>
+                      <td className="px-4 py-1.5 text-right">{product.total_comprado}</td>
                       <td className="px-4 py-1.5 text-right font-semibold">{product.stock}</td>
-                      <td className="px-4 py-1.5 text-right">{quantitySold}</td>
+                      <td className="px-4 py-1.5 text-right">{formatCurrency(visibleInvestment)}</td>
                       <td className="px-4 py-1.5 text-right">{formatCurrency(totalSales)}</td>
+                      <td className="px-4 py-1.5 text-right">{formatCurrency(estimatedMargin)}</td>
+                      <td className="px-4 py-1.5 text-right">{formatPercentage(soldPercentage)}%</td>
                       <td className="px-4 py-1.5 text-right">{formatShortDate(product.created_at)}</td>
                       <td className="px-4 py-1.5 text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -474,19 +386,11 @@ export function ProductsTable({
                 }
 
                 return (
-                  <tr
-                    key={`empty-${rowIndex}`}
-                    className="border-t border-[#f1e4db] bg-white text-[0.92rem] text-[color:var(--brand-mid)]"
-                  >
-                    <td className="px-4 py-1.5">
-                      {rowIndex === 0 && items.length === 0
-                        ? tableMissing
-                          ? "Tabla pendiente"
-                          : "Sin productos"
-                        : ""}
-                    </td>
-                    <td className="px-4 py-1.5">&nbsp;</td>
-                    <td className="px-4 py-1.5">&nbsp;</td>
+                  <tr key={`empty-${rowIndex}`} className="border-t border-[#f1e4db] bg-white text-[0.92rem] text-[color:var(--brand-mid)]">
+                    <td className="px-4 py-1.5">{rowIndex === 0 && items.length === 0 ? tableMissing ? "Tabla pendiente" : "Sin productos" : ""}</td>
+                    <td className="px-4 py-1.5 text-right">&nbsp;</td>
+                    <td className="px-4 py-1.5 text-right">&nbsp;</td>
+                    <td className="px-4 py-1.5 text-right">&nbsp;</td>
                     <td className="px-4 py-1.5 text-right">&nbsp;</td>
                     <td className="px-4 py-1.5 text-right">&nbsp;</td>
                     <td className="px-4 py-1.5 text-right">&nbsp;</td>
@@ -503,9 +407,7 @@ export function ProductsTable({
       </div>
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-[color:var(--brand-mid)]">
-          Página {currentPage} de {totalPages}
-        </p>
+        <p className="text-sm text-[color:var(--brand-mid)]">Página {currentPage} de {totalPages}</p>
 
         <div className="flex items-center gap-2.5">
           <Link
@@ -521,11 +423,7 @@ export function ProductsTable({
             <span className="font-semibold text-inherit">Anterior</span>
           </Link>
           <Link
-            href={
-              currentPage < totalPages
-                ? `/productos?page=${currentPage + 1}`
-                : `/productos?page=${totalPages}`
-            }
+            href={currentPage < totalPages ? `/productos?page=${currentPage + 1}` : `/productos?page=${totalPages}`}
             aria-disabled={currentPage >= totalPages}
             className={[
               "inline-flex min-h-11 min-w-[8.4rem] items-center justify-center rounded-full border px-5 text-sm font-semibold transition",
@@ -546,12 +444,8 @@ export function ProductsTable({
           <div className="relative z-10 flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-[1.9rem] border border-[#eadcd2] bg-white shadow-[0_30px_70px_rgba(22,36,61,0.2)]">
             <div className="flex items-start justify-between gap-4 border-b border-[#efe3da] px-5 py-5 sm:px-6">
               <div>
-                <p className="text-[0.74rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--brand-mid)]">
-                  Producto
-                </p>
-                <h2 className="mt-2 font-heading text-[2rem] font-bold tracking-[-0.04em] text-[color:var(--brand-dark)]">
-                  Editar producto
-                </h2>
+                <p className="text-[0.74rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--brand-mid)]">Producto</p>
+                <h2 className="mt-2 font-heading text-[2rem] font-bold tracking-[-0.04em] text-[color:var(--brand-dark)]">Editar producto</h2>
               </div>
 
               <button
@@ -570,11 +464,7 @@ export function ProductsTable({
                   <span className="text-sm font-semibold text-[color:var(--brand-dark)]">Nombre</span>
                   <input
                     value={editState.nombre}
-                    onChange={(event) =>
-                      setEditState((current) =>
-                        current ? { ...current, nombre: event.target.value } : current
-                      )
-                    }
+                    onChange={(event) => setEditState((current) => current ? { ...current, nombre: event.target.value } : current)}
                     type="text"
                     className="h-11 w-full rounded-xl border border-[#e7ddd6] bg-white px-4 text-sm text-[color:var(--brand-dark)] outline-none transition focus:border-[color:var(--accent)] focus:ring-4 focus:ring-[rgba(209,7,84,0.12)]"
                   />
@@ -584,11 +474,7 @@ export function ProductsTable({
                   <span className="text-sm font-semibold text-[color:var(--brand-dark)]">Precio de venta</span>
                   <input
                     value={editState.precioVenta}
-                    onChange={(event) =>
-                      setEditState((current) =>
-                        current ? { ...current, precioVenta: event.target.value } : current
-                      )
-                    }
+                    onChange={(event) => setEditState((current) => current ? { ...current, precioVenta: event.target.value } : current)}
                     type="text"
                     inputMode="decimal"
                     placeholder="Opcional"
@@ -624,8 +510,3 @@ export function ProductsTable({
     </section>
   );
 }
-
-
-
-
-

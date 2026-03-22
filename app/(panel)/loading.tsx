@@ -11,7 +11,7 @@
 function SkeletonRow() {
   return (
     <tr className="border-t border-[#f1e4db] bg-white/80">
-      <td className="px-4 py-2" colSpan={10}>
+      <td className="px-4 py-2" colSpan={11}>
         <div className="h-4 animate-pulse rounded-full bg-[#f7efe9]" />
       </td>
     </tr>
@@ -45,17 +45,18 @@ export default function Loading() {
 
         <div className="mt-5 overflow-hidden rounded-[1.25rem] border border-[#eadcd2] bg-[#fffdfa]">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1240px] border-collapse">
+            <table className="w-full min-w-[1420px] border-collapse">
               <thead>
                 <tr className="bg-[#f6ede7]">
                   <th className="px-4 py-2"><div className="h-4 w-20 animate-pulse rounded-full bg-[#e1d3c8]" /></th>
-                  <th className="px-4 py-2"><div className="h-4 w-16 animate-pulse rounded-full bg-[#e1d3c8]" /></th>
-                  <th className="px-4 py-2"><div className="h-4 w-20 animate-pulse rounded-full bg-[#e1d3c8]" /></th>
                   <th className="px-4 py-2"><div className="ml-auto h-4 w-16 animate-pulse rounded-full bg-[#e1d3c8]" /></th>
+                  <th className="px-4 py-2"><div className="ml-auto h-4 w-20 animate-pulse rounded-full bg-[#e1d3c8]" /></th>
                   <th className="px-4 py-2"><div className="ml-auto h-4 w-20 animate-pulse rounded-full bg-[#e1d3c8]" /></th>
                   <th className="px-4 py-2"><div className="ml-auto h-4 w-14 animate-pulse rounded-full bg-[#e1d3c8]" /></th>
                   <th className="px-4 py-2"><div className="ml-auto h-4 w-20 animate-pulse rounded-full bg-[#e1d3c8]" /></th>
                   <th className="px-4 py-2"><div className="ml-auto h-4 w-20 animate-pulse rounded-full bg-[#e1d3c8]" /></th>
+                  <th className="px-4 py-2"><div className="ml-auto h-4 w-20 animate-pulse rounded-full bg-[#e1d3c8]" /></th>
+                  <th className="px-4 py-2"><div className="ml-auto h-4 w-16 animate-pulse rounded-full bg-[#e1d3c8]" /></th>
                   <th className="px-4 py-2"><div className="ml-auto h-4 w-16 animate-pulse rounded-full bg-[#e1d3c8]" /></th>
                   <th className="px-4 py-2"><div className="ml-auto h-4 w-16 animate-pulse rounded-full bg-[#e1d3c8]" /></th>
                 </tr>
