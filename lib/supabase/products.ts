@@ -1,4 +1,4 @@
-﻿import type { PostgrestSingleResponse, SupabaseClient } from "@supabase/supabase-js";
+import type { PostgrestSingleResponse, SupabaseClient } from "@supabase/supabase-js";
 
 export type ProductRecord = {
   id: number;
@@ -16,6 +16,7 @@ export type ProductOption = {
   id: number;
   nombre: string;
   categoria: string;
+  costo_unitario: number;
   precio_venta: number | null;
   stock: number;
   total_comprado: number;
@@ -224,7 +225,7 @@ export async function getAllProductOptions(
 ): Promise<{ items: ProductOption[]; tableMissing: boolean }> {
   const response = await supabase
     .from("products")
-    .select("id, nombre, categoria, precio_venta, stock, total_comprado, is_active")
+    .select("id, nombre, categoria, costo_unitario, precio_venta, stock, total_comprado, is_active")
     .order("nombre", { ascending: true });
 
   const typedResponse = response as PostgrestSingleResponse<ProductOption[]>;
