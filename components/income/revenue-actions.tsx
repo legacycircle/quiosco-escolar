@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  divideDecimalStringByInteger,
+  normalizeDecimalString,
   normalizeOptionalDecimalString,
   parsePositiveInteger,
 } from "@/lib/decimal";
@@ -24,77 +24,21 @@ type RevenueActionsProps = {
   productsTableMissing: boolean;
 };
 
-type DraftSale = {
-  id: string;
-  productId: number;
-  nombre: string;
-  fechaDisplay: string;
-  fechaIso: string;
-  precio: string;
-  unidades: number;
-  total: string;
-  totalValue: number;
-  unitCost: string;
-};
-
 type FormState = {
   nombre: string;
-  fecha: string;
   precio: string;
   unidades: string;
   total: string;
 };
 
-type CalculationMode = "price" | "total";
-
 type PriceSource = "product" | "manual";
 
-function getTodayShortDate() {
-  return formatDateForInput(new Date());
-}
-
-function formatDateForInput(value: Date) {
-  const day = String(value.getDate()).padStart(2, "0");
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const year = String(value.getFullYear()).slice(-2);
-  return `${day}/${month}/${year}`;
-}
-
-function parseShortDate(value: string) {
-  const trimmed = value.trim();
-  const match = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/);
-
-  if (!match) {
-    return null;
-  }
-
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const rawYear = Number(match[3]);
-  const year = match[3].length === 2 ? 2000 + rawYear : rawYear;
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-
-  if (
-    parsed.getUTCFullYear() !== year ||
-    parsed.getUTCMonth() !== month - 1 ||
-    parsed.getUTCDate() !== day
-  ) {
-    return null;
-  }
-
-  return parsed;
-}
-
-function toIsoDate(value: Date) {
-  const year = value.getUTCFullYear();
-  const month = String(value.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(value.getUTCDate()).padStart(2, "0");
+function getTodayIsoDate() {
+  const now = new Date();
+  const year = String(now.getFullYear());
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function normalizeDateInput(value: string) {
-  const parsed = parseShortDate(value);
-  return parsed ? formatDateForInput(new Date(parsed.getTime())) : value;
 }
 
 function normalizeName(value: string) {
@@ -147,7 +91,10 @@ function getProductCostString(product: ProductOption | null) {
     return "0";
   }
 
-  return normalizeOptionalDecimalString(String(product.costo_unitario), { scale: 8 }) ?? String(product.costo_unitario);
+  return (
+    normalizeOptionalDecimalString(String(product.costo_unitario), { scale: 8 }) ??
+    String(product.costo_unitario)
+  );
 }
 
 function formatSaveError(message: string) {
@@ -169,7 +116,7 @@ function formatSaveError(message: string) {
     );
   }
 
-  return buildFeedback("No se pudo guardar", "Supabase devolvio un error al guardar el cierre.", message);
+  return buildFeedback("No se pudo guardar", "Supabase devolvio un error al guardar la venta.", message);
 }
 
 function FeedbackBanner({ feedback }: { feedback: Feedback }) {
@@ -193,10 +140,9 @@ function FeedbackBanner({ feedback }: { feedback: Feedback }) {
   );
 }
 
-function initialForm(date = getTodayShortDate()): FormState {
+function initialForm(): FormState {
   return {
     nombre: "",
-    fecha: date,
     precio: "",
     unidades: "",
     total: "",
@@ -213,8 +159,6 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
   const [isNameFocused, setIsNameFocused] = useState(false);
   const [form, setForm] = useState<FormState>(initialForm);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const [draftSales, setDraftSales] = useState<DraftSale[]>([]);
-  const [calculationMode, setCalculationMode] = useState<CalculationMode>("price");
   const [priceSource, setPriceSource] = useState<PriceSource>("product");
   const [isCalculatingTotal, setIsCalculatingTotal] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -255,9 +199,6 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
       .slice(0, 6);
   }, [activeProducts, deferredName]);
 
-  const totalUnits = draftSales.reduce((sum, item) => sum + item.unidades, 0);
-  const totalAmount = draftSales.reduce((sum, item) => sum + item.totalValue, 0);
-
   useEffect(() => {
     if (priceSource !== "product") {
       return;
@@ -278,11 +219,6 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
   }, [priceSource, selectedProduct]);
 
   useEffect(() => {
-    if (calculationMode !== "price") {
-      setIsCalculatingTotal(false);
-      return;
-    }
-
     const quantity = parsePositiveInteger(form.unidades);
     const price = normalizeOptionalDecimalString(form.precio);
 
@@ -314,38 +250,21 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
       window.clearTimeout(timeoutId);
       setIsCalculatingTotal(false);
     };
-  }, [calculationMode, form.precio, form.unidades]);
-
-  useEffect(() => {
-    if (calculationMode !== "total") {
-      return;
-    }
-
-    const quantity = parsePositiveInteger(form.unidades);
-    const total = normalizeOptionalDecimalString(form.total);
-
-    if (!quantity || total == null) {
-      return;
-    }
-
-    const computedPrice = divideDecimalStringByInteger(total, quantity) ?? "";
-
-    setForm((current) => {
-      if (current.precio === computedPrice) {
-        return current;
-      }
-
-      return {
-        ...current,
-        precio: computedPrice,
-      };
-    });
-  }, [calculationMode, form.total, form.unidades]);
+  }, [form.precio, form.unidades]);
 
   const openModal = () => {
+    if (productsTableMissing) {
+      setFeedback(
+        buildFeedback(
+          "Tabla pendiente",
+          "La tabla products no existe todavia en Supabase, asi que no se pueden registrar ventas."
+        )
+      );
+      return;
+    }
+
     setFeedback(null);
     setForm(initialForm());
-    setCalculationMode("price");
     setPriceSource("product");
     setIsNameFocused(false);
     setIsOpen(true);
@@ -363,40 +282,23 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
       precio: getProductPriceString(product),
     }));
     setPriceSource("product");
-    setCalculationMode("price");
     setIsNameFocused(false);
   };
 
-  const handleAddDraft = () => {
-    if (productsTableMissing) {
-      setFeedback(
-        buildFeedback(
-          "Tabla pendiente",
-          "La tabla products no existe todavia en Supabase, asi que no se pueden sugerir productos."
-        )
-      );
-      return;
-    }
-
+  const handleSubmit = () => {
     if (!selectedProduct) {
       setFeedback(
         buildFeedback(
           "Producto obligatorio",
-          "Escribe y elige un producto valido desde las coincidencias antes de agregarlo al lote."
+          "Escribe y selecciona un producto valido desde las coincidencias antes de guardar."
         )
       );
       return;
     }
 
-    const parsedDate = parseShortDate(form.fecha);
     const quantity = parsePositiveInteger(form.unidades);
-    const total = normalizeOptionalDecimalString(form.total);
-    const price = normalizeOptionalDecimalString(form.precio);
-
-    if (!parsedDate) {
-      setFeedback(buildFeedback("Fecha invalida", "Usa el formato dd/mm/yy para la fecha de venta."));
-      return;
-    }
+    const price = normalizeDecimalString(form.precio, { allowZero: false });
+    const total = quantity ? multiplyDecimalStringByInteger(form.precio, quantity) : null;
 
     if (!quantity) {
       setFeedback(buildFeedback("Unidades invalidas", "Las unidades vendidas deben ser enteros positivos."));
@@ -404,47 +306,12 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
     }
 
     if (!price) {
-      setFeedback(buildFeedback("Precio invalido", "Ingresa un precio por unidad valido."));
+      setFeedback(buildFeedback("Precio invalido", "Ingresa un precio por unidad valido mayor a cero."));
       return;
     }
 
     if (!total) {
-      setFeedback(buildFeedback("Total invalido", "Ingresa un total valido para la venta."));
-      return;
-    }
-
-    const draftSale: DraftSale = {
-      id: `${Date.now()}-${selectedProduct.id}`,
-      productId: selectedProduct.id,
-      nombre: selectedProduct.nombre,
-      fechaDisplay: formatDateForInput(new Date(parsedDate.getTime())),
-      fechaIso: toIsoDate(parsedDate),
-      precio: price,
-      unidades: quantity,
-      total,
-      totalValue: Number(total),
-      unitCost: getProductCostString(selectedProduct),
-    };
-
-    setDraftSales((current) => [draftSale, ...current]);
-    setForm(initialForm(formatDateForInput(new Date(parsedDate.getTime()))));
-    setCalculationMode("price");
-    setPriceSource("product");
-    setIsNameFocused(false);
-    setFeedback(
-      buildFeedback(
-        "Venta agregada",
-        `Se agrego ${draftSale.nombre} al lote del cierre con ${draftSale.unidades} unidades.`,
-        undefined,
-        "success"
-      )
-    );
-    closeModal();
-  };
-
-  const handleSaveBatch = () => {
-    if (draftSales.length === 0) {
-      setFeedback(buildFeedback("Lote vacio", "Agrega al menos una venta antes de guardar el cierre."));
+      setFeedback(buildFeedback("Total invalido", "Completa unidades y precio para calcular el total."));
       return;
     }
 
@@ -453,49 +320,38 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
 
       void (async () => {
         try {
-          const groupedByDate = draftSales.reduce<Record<string, DraftSale[]>>((acc, item) => {
-            acc[item.fechaIso] = [...(acc[item.fechaIso] ?? []), item];
-            return acc;
-          }, {});
-
           const supabase = createSupabaseBrowserClient();
+          const saleInsert = await supabase
+            .from("sales")
+            .insert({ sale_date: getTodayIsoDate() })
+            .select("id")
+            .single();
 
-          for (const [saleDate, items] of Object.entries(groupedByDate)) {
-            const saleInsert = await supabase
-              .from("sales")
-              .insert({ sale_date: saleDate })
-              .select("id")
-              .single();
-
-            if (saleInsert.error || !saleInsert.data) {
-              setFeedback(formatSaveError(saleInsert.error?.message ?? "No se pudo crear la cabecera de venta."));
-              return;
-            }
-
-            const saleId = saleInsert.data.id as number;
-            const itemInsert = await supabase.from("sale_items").insert(
-              items.map((item) => ({
-                sale_id: saleId,
-                product_id: item.productId,
-                quantity: item.unidades,
-                unit_price_snapshot: item.precio,
-                unit_cost_snapshot: item.unitCost,
-                line_total: item.total,
-              }))
-            );
-
-            if (itemInsert.error) {
-              setFeedback(formatSaveError(itemInsert.error.message));
-              return;
-            }
+          if (saleInsert.error || !saleInsert.data) {
+            setFeedback(formatSaveError(saleInsert.error?.message ?? "No se pudo crear la cabecera de venta."));
+            return;
           }
 
-          const savedCount = draftSales.length;
-          setDraftSales([]);
+          const itemInsert = await supabase.from("sale_items").insert({
+            sale_id: saleInsert.data.id as number,
+            product_id: selectedProduct.id,
+            quantity,
+            unit_price_snapshot: price,
+            unit_cost_snapshot: getProductCostString(selectedProduct),
+            line_total: total,
+          });
+
+          if (itemInsert.error) {
+            setFeedback(formatSaveError(itemInsert.error.message));
+            return;
+          }
+
+          setForm(initialForm());
+          closeModal();
           setFeedback(
             buildFeedback(
-              "Cierre guardado",
-              `Se guardaron ${savedCount} lineas de venta en Supabase.`,
+              "Venta registrada",
+              `Se guardo ${selectedProduct.nombre} con ${quantity} unidades por ${formatCurrency(Number(total))}.`,
               undefined,
               "success"
             )
@@ -503,119 +359,25 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
           router.refresh();
         } catch (error) {
           const detail = error instanceof Error ? error.message : "Error inesperado no identificado.";
-          setFeedback(buildFeedback("Fallo el cierre", "No se pudo guardar el lote de ingresos.", detail));
+          setFeedback(buildFeedback("Fallo el registro", "No se pudo guardar la venta.", detail));
         }
       })();
     });
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <button
           type="button"
           onClick={openModal}
           className="inline-flex min-h-11 items-center justify-center rounded-full border border-[color:var(--brand-dark)] bg-[color:var(--brand-dark)] px-5 text-sm font-semibold text-white transition hover:opacity-92"
         >
-          Registrar ventas
-        </button>
-        <button
-          type="button"
-          onClick={handleSaveBatch}
-          disabled={isPending || draftSales.length === 0}
-          aria-busy={isPending}
-          className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#eadcd2] bg-white px-5 text-sm font-semibold text-[color:var(--brand-dark)] transition hover:border-[#d7c5b7] disabled:cursor-not-allowed disabled:opacity-65"
-        >
-          Guardar cierre
+          Registrar venta
         </button>
       </div>
 
-      {feedback ? <FeedbackBanner feedback={feedback} /> : null}
-
-      <section className="rounded-[2rem] border border-[#eadcd2] bg-white p-4 shadow-[0_18px_40px_rgba(22,36,61,0.06)] sm:p-5 lg:rounded-[1.8rem]">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[0.74rem] font-semibold uppercase tracking-[0.18em] text-[color:var(--brand-mid)]">
-              Cierre del dia
-            </p>
-            <h2 className="mt-2 font-heading text-[1.9rem] font-bold tracking-[-0.04em] text-[color:var(--brand-dark)]">
-              Lote en borrador
-            </h2>
-          </div>
-          <p className="text-sm text-[color:var(--brand-mid)]">
-            {draftSales.length === 0 ? "Todavia no agregaste ventas" : `${draftSales.length} lineas listas para guardar`}
-          </p>
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <article className="rounded-[1.2rem] border border-[#efe3da] bg-[#fcfaf8] px-4 py-3">
-            <p className="text-[0.78rem] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-mid)]">
-              Productos cargados
-            </p>
-            <p className="mt-2 font-heading text-[2rem] font-bold tracking-[-0.05em] text-[color:var(--brand-dark)]">
-              {draftSales.length}
-            </p>
-          </article>
-          <article className="rounded-[1.2rem] border border-[#efe3da] bg-[#fcfaf8] px-4 py-3">
-            <p className="text-[0.78rem] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-mid)]">
-              Unidades totales
-            </p>
-            <p className="mt-2 font-heading text-[2rem] font-bold tracking-[-0.05em] text-[color:var(--brand-dark)]">
-              {totalUnits}
-            </p>
-          </article>
-          <article className="rounded-[1.2rem] border border-[#efe3da] bg-[#fcfaf8] px-4 py-3">
-            <p className="text-[0.78rem] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand-mid)]">
-              Total del lote
-            </p>
-            <p className="mt-2 font-heading text-[2rem] font-bold tracking-[-0.05em] text-[color:var(--brand-dark)]">
-              {formatCurrency(totalAmount)}
-            </p>
-          </article>
-        </div>
-
-        <div className="mt-4 overflow-hidden rounded-[1.2rem] border border-[#eadcd2] bg-[#fffdfa]">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] border-collapse">
-              <thead>
-                <tr className="bg-[#f6ede7] text-left text-[0.84rem] font-semibold text-[color:var(--brand-dark)]">
-                  <th className="px-4 py-2">Nombre</th>
-                  <th className="px-4 py-2 text-right">Fecha</th>
-                  <th className="px-4 py-2 text-right">Precio</th>
-                  <th className="px-4 py-2 text-right">Unidades</th>
-                  <th className="px-4 py-2 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {draftSales.length === 0 ? (
-                  <tr className="border-t border-[#f1e4db] bg-white text-[0.92rem] text-[color:var(--brand-mid)]">
-                    <td className="px-4 py-4">
-                      Agrega productos desde "Registrar ventas" para armar el cierre del dia.
-                    </td>
-                    <td className="px-4 py-4 text-right">&nbsp;</td>
-                    <td className="px-4 py-4 text-right">&nbsp;</td>
-                    <td className="px-4 py-4 text-right">&nbsp;</td>
-                    <td className="px-4 py-4 text-right">&nbsp;</td>
-                  </tr>
-                ) : (
-                  draftSales.map((item) => (
-                    <tr
-                      key={item.id}
-                      className="border-t border-[#f1e4db] bg-white text-[0.92rem] text-[color:var(--brand-dark)]"
-                    >
-                      <td className="px-4 py-2.5 font-semibold">{item.nombre}</td>
-                      <td className="px-4 py-2.5 text-right">{item.fechaDisplay}</td>
-                      <td className="px-4 py-2.5 text-right">S/ {item.precio}</td>
-                      <td className="px-4 py-2.5 text-right">{item.unidades}</td>
-                      <td className="px-4 py-2.5 text-right font-semibold">S/ {item.total}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+      {feedback && !isOpen ? <FeedbackBanner feedback={feedback} /> : null}
 
       {isOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(22,36,61,0.38)] p-4 sm:items-center sm:p-6">
@@ -628,7 +390,7 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
                   Ingresos
                 </p>
                 <h2 className="mt-2 font-heading text-[2rem] font-bold tracking-[-0.04em] text-[color:var(--brand-dark)] sm:text-[2.3rem]">
-                  Registrar ventas
+                  Registrar venta
                 </h2>
               </div>
 
@@ -647,11 +409,11 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
                 className="grid gap-4 md:grid-cols-2"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  handleAddDraft();
+                  handleSubmit();
                 }}
               >
                 <label className="relative block space-y-2 md:col-span-2">
-                  <span className="text-sm font-semibold text-[color:var(--brand-dark)]">Nombre</span>
+                  <span className="text-sm font-semibold text-[color:var(--brand-dark)]">Producto</span>
                   <input
                     value={form.nombre}
                     onFocus={() => setIsNameFocused(true)}
@@ -663,7 +425,7 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
                       setPriceSource("product");
                     }}
                     type="text"
-                    placeholder="Escribe un producto"
+                    placeholder="Escribe para buscar un producto"
                     className="h-11 w-full rounded-xl border border-[#e7ddd6] bg-white px-4 text-sm text-[color:var(--brand-dark)] outline-none transition placeholder:text-[color:var(--brand-mid)]/60 focus:border-[color:var(--accent)] focus:ring-4 focus:ring-[rgba(209,7,84,0.12)]"
                     autoComplete="off"
                   />
@@ -683,7 +445,7 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
                               {product.nombre}
                             </span>
                             <span className="mt-1 block text-xs text-[color:var(--brand-mid)]">
-                              {product.categoria} · Stock: {product.stock}
+                              {product.categoria} | Stock: {product.stock}
                             </span>
                           </span>
                           <span className="text-xs font-semibold text-[color:var(--brand-mid)]">
@@ -693,42 +455,6 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
                       ))}
                     </div>
                   ) : null}
-                </label>
-
-                <label className="block space-y-2">
-                  <span className="text-sm font-semibold text-[color:var(--brand-dark)]">Fecha</span>
-                  <input
-                    value={form.fecha}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, fecha: event.target.value }))
-                    }
-                    onBlur={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        fecha: normalizeDateInput(event.target.value),
-                      }))
-                    }
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="dd/mm/yy"
-                    className="h-11 w-full rounded-xl border border-[#e7ddd6] bg-white px-4 text-sm text-[color:var(--brand-dark)] outline-none transition placeholder:text-[color:var(--brand-mid)]/60 focus:border-[color:var(--accent)] focus:ring-4 focus:ring-[rgba(209,7,84,0.12)]"
-                  />
-                </label>
-
-                <label className="block space-y-2">
-                  <span className="text-sm font-semibold text-[color:var(--brand-dark)]">Precio</span>
-                  <input
-                    value={form.precio}
-                    onChange={(event) => {
-                      setForm((current) => ({ ...current, precio: event.target.value }));
-                      setCalculationMode("price");
-                      setPriceSource("manual");
-                    }}
-                    type="text"
-                    inputMode="decimal"
-                    placeholder={selectedProduct?.precio_venta == null ? "Sin precio predefinido" : "0.00"}
-                    className="h-11 w-full rounded-xl border border-[#e7ddd6] bg-white px-4 text-sm text-[color:var(--brand-dark)] outline-none transition placeholder:text-[color:var(--brand-mid)]/60 focus:border-[color:var(--accent)] focus:ring-4 focus:ring-[rgba(209,7,84,0.12)]"
-                  />
                 </label>
 
                 <label className="block space-y-2">
@@ -749,19 +475,29 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
                 </label>
 
                 <label className="block space-y-2">
+                  <span className="text-sm font-semibold text-[color:var(--brand-dark)]">Precio</span>
+                  <input
+                    value={form.precio}
+                    onChange={(event) => {
+                      setForm((current) => ({ ...current, precio: event.target.value }));
+                      setPriceSource("manual");
+                    }}
+                    type="text"
+                    inputMode="decimal"
+                    placeholder={selectedProduct?.precio_venta == null ? "0.00" : "Precio de venta"}
+                    className="h-11 w-full rounded-xl border border-[#e7ddd6] bg-white px-4 text-sm text-[color:var(--brand-dark)] outline-none transition placeholder:text-[color:var(--brand-mid)]/60 focus:border-[color:var(--accent)] focus:ring-4 focus:ring-[rgba(209,7,84,0.12)]"
+                  />
+                </label>
+
+                <label className="block space-y-2 md:col-span-2">
                   <span className="text-sm font-semibold text-[color:var(--brand-dark)]">Total</span>
                   <div className="relative">
                     <input
                       value={form.total}
-                      onChange={(event) => {
-                        setForm((current) => ({ ...current, total: event.target.value }));
-                        setCalculationMode("total");
-                        setPriceSource("manual");
-                      }}
+                      readOnly
                       type="text"
-                      inputMode="decimal"
                       placeholder="0.00"
-                      className="h-11 w-full rounded-xl border border-[#e7ddd6] bg-white px-4 pr-28 text-sm text-[color:var(--brand-dark)] outline-none transition placeholder:text-[color:var(--brand-mid)]/60 focus:border-[color:var(--accent)] focus:ring-4 focus:ring-[rgba(209,7,84,0.12)]"
+                      className="h-11 w-full rounded-xl border border-[#e7ddd6] bg-[#fcfaf8] px-4 pr-28 text-sm font-semibold text-[color:var(--brand-dark)] outline-none"
                     />
                     {isCalculatingTotal ? (
                       <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center gap-2 text-xs font-semibold text-[color:var(--brand-mid)]">
@@ -781,29 +517,33 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
                       ? selectedProduct.precio_venta == null
                         ? "Este producto no tiene precio de venta en /productos, asi que puedes escribirlo manualmente."
                         : `Precio sugerido desde /productos: ${formatCurrency(selectedProduct.precio_venta)}`
-                      : "Si el campo nombre esta vacio, no se mostrara ninguna sugerencia."}
+                      : "Si no escribes nada, no se mostrara ninguna sugerencia."}
                   </p>
                   <p className="mt-2 text-xs">
-                    Si cambias el total manualmente, recalculamos el precio por unidad dividiendo total entre unidades vendidas.
+                    La venta se guardara directamente con la fecha de hoy.
                   </p>
                 </div>
 
-                <div className="md:col-span-2 flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#eadcd2] bg-white px-5 text-sm font-semibold text-[color:var(--brand-dark)] transition hover:border-[#d7c5b7]"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isPending}
-                    aria-busy={isPending}
-                    className="inline-flex min-h-11 items-center justify-center rounded-full border border-[color:var(--brand-dark)] bg-[color:var(--brand-dark)] px-5 text-sm font-semibold text-white transition hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-75"
-                  >
-                    Agregar al lote
-                  </button>
+                <div className="md:col-span-2 flex flex-col gap-4 pt-1">
+                  {feedback ? <FeedbackBanner feedback={feedback} /> : null}
+
+                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#eadcd2] bg-white px-5 text-sm font-semibold text-[color:var(--brand-dark)] transition hover:border-[#d7c5b7]"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isPending}
+                      aria-busy={isPending}
+                      className="inline-flex min-h-11 items-center justify-center rounded-full border border-[color:var(--brand-dark)] bg-[color:var(--brand-dark)] px-5 text-sm font-semibold text-white transition hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-75"
+                    >
+                      Guardar venta
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>

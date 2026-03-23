@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { RevenueActions } from "@/components/income/revenue-actions";
 import { IncomeTable } from "@/components/income/income-table";
@@ -94,7 +94,7 @@ export default async function RevenuePage({ searchParams }: RevenuePageProps) {
               Ingresos
             </h1>
             <p className="mt-1.5 max-w-2xl text-sm text-[color:var(--brand-mid)] sm:text-base">
-              Carga ventas por lote al cierre del dia, usando productos reales y calculos visibles antes de guardar.
+              Registra una venta por vez usando productos reales y calculo automatico del total al momento de guardar.
             </p>
           </div>
         </div>
@@ -114,7 +114,7 @@ export default async function RevenuePage({ searchParams }: RevenuePageProps) {
             detail={tableMissing ? "Tablas pendientes" : undefined}
           />
           <MetricCard
-            label="Lineas registradas"
+            label="Ventas registradas"
             value={String(lineCount)}
             detail={tableMissing ? "Sin historial todavia" : `Pagina actual: ${currentPage}`}
           />
