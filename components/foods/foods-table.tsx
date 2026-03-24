@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { normalizeDecimalString } from "@/lib/decimal";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-import type { PreparedFoodRecord } from "@/lib/supabase/prepared-foods";
+import type {
+  PreparedFoodRecord,
+  PreparedFoodSalesMap,
+} from "@/lib/supabase/prepared-foods";
 
 type Tone = "danger" | "success";
 
@@ -25,6 +28,7 @@ type FoodsTableProps = {
   totalCount: number;
   firstItem: number;
   lastItem: number;
+  salesByFood: PreparedFoodSalesMap;
 };
 
 type EditState = {
@@ -69,6 +73,14 @@ function formatDeleteError(message: string) {
     return buildFeedback(
       "Tabla pendiente",
       "La tabla prepared_foods todavia no existe en Supabase.",
+      message
+    );
+  }
+
+  if (normalized.includes("foreign key") || normalized.includes("violates foreign key")) {
+    return buildFeedback(
+      "Borrado bloqueado",
+      "Este alimento ya tiene ventas registradas y no se puede borrar mientras conserve historial.",
       message
     );
   }
@@ -180,6 +192,7 @@ export function FoodsTable({
   totalCount,
   firstItem,
   lastItem,
+  salesByFood,
 }: FoodsTableProps) {
   const router = useRouter();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -296,6 +309,18 @@ export function FoodsTable({
   };
 
   const handleRemove = (food: PreparedFoodRecord) => {
+    const salesSummary = salesByFood[food.id];
+
+    if (salesSummary && salesSummary.quantitySold > 0) {
+      setFeedback(
+        buildFeedback(
+          "Borrado bloqueado",
+          "Este alimento ya tiene ventas registradas. Conserva el registro para mantener el historial de ingresos."
+        )
+      );
+      return;
+    }
+
     startTransition(() => {
       setFeedback(null);
 
@@ -353,7 +378,7 @@ export function FoodsTable({
 
       <div className="mt-4 overflow-hidden rounded-[1.25rem] border border-[#eadcd2] bg-[#fffdfa]">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1040px] border-collapse">
+          <table className="w-full min-w-[1220px] border-collapse">
             <thead>
               <tr className="bg-[#f6ede7] text-left text-[0.88rem] font-semibold text-[color:var(--brand-dark)]">
                 <th className="px-4 py-1.5">Nombre</th>
@@ -361,6 +386,8 @@ export function FoodsTable({
                 <th className="px-4 py-1.5 text-right">Costo</th>
                 <th className="px-4 py-1.5 text-right">Precio de venta</th>
                 <th className="px-4 py-1.5 text-right">Fecha</th>
+                <th className="px-4 py-1.5 text-right">Unidades vendidas</th>
+                <th className="px-4 py-1.5 text-right">Total recaudado</th>
                 <th className="px-4 py-1.5 text-right">Editar</th>
                 <th className="px-4 py-1.5 text-right">Borrar</th>
               </tr>
@@ -370,6 +397,11 @@ export function FoodsTable({
                 const food = items[rowIndex];
 
                 if (food) {
+                  const salesSummary = salesByFood[food.id] ?? {
+                    quantitySold: 0,
+                    totalRevenue: 0,
+                  };
+
                   return (
                     <tr
                       key={food.id}
@@ -380,6 +412,8 @@ export function FoodsTable({
                       <td className="px-4 py-1.5 text-right">{formatCurrency(food.costo_produccion)}</td>
                       <td className="px-4 py-1.5 text-right font-semibold">{formatCurrency(food.precio_venta)}</td>
                       <td className="px-4 py-1.5 text-right">{formatShortDate(food.fecha_preparacion)}</td>
+                      <td className="px-4 py-1.5 text-right">{salesSummary.quantitySold}</td>
+                      <td className="px-4 py-1.5 text-right font-semibold">{formatCurrency(salesSummary.totalRevenue)}</td>
                       <td className="px-4 py-1.5 text-right">
                         <button
                           type="button"
@@ -419,6 +453,8 @@ export function FoodsTable({
                         : ""}
                     </td>
                     <td className="px-4 py-1.5">&nbsp;</td>
+                    <td className="px-4 py-1.5 text-right">&nbsp;</td>
+                    <td className="px-4 py-1.5 text-right">&nbsp;</td>
                     <td className="px-4 py-1.5 text-right">&nbsp;</td>
                     <td className="px-4 py-1.5 text-right">&nbsp;</td>
                     <td className="px-4 py-1.5 text-right">&nbsp;</td>

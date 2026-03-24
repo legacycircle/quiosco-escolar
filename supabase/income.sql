@@ -1,4 +1,4 @@
-create or replace function public.is_approved_user()
+﻿create or replace function public.is_approved_user()
 returns boolean
 language sql
 security definer
@@ -26,12 +26,14 @@ create table if not exists public.sales (
 create table if not exists public.sale_items (
   id bigserial primary key,
   sale_id bigint not null references public.sales(id) on delete cascade,
-  product_id bigint not null references public.products(id) on delete restrict,
+  product_id bigint references public.products(id) on delete restrict,
+  prepared_food_id bigint references public.prepared_foods(id) on delete restrict,
   quantity integer not null check (quantity > 0),
   unit_price_snapshot numeric(16,8) not null check (unit_price_snapshot >= 0),
   unit_cost_snapshot numeric(16,8) not null check (unit_cost_snapshot >= 0),
   line_total numeric(16,8) not null check (line_total >= 0),
-  created_at timestamptz not null default timezone('utc', now())
+  created_at timestamptz not null default timezone('utc', now()),
+  constraint sale_items_single_source_check check (num_nonnulls(product_id, prepared_food_id) = 1)
 );
 
 create index if not exists sales_sale_date_idx
@@ -45,6 +47,9 @@ create index if not exists sale_items_sale_id_idx
 
 create index if not exists sale_items_product_id_idx
   on public.sale_items (product_id);
+
+create index if not exists sale_items_prepared_food_id_idx
+  on public.sale_items (prepared_food_id);
 
 create index if not exists sale_items_created_at_idx
   on public.sale_items (created_at desc);
@@ -129,7 +134,7 @@ to authenticated
 using (public.is_approved_user());
 
 comment on table public.sales is
-'Cabecera de cierres diarios de venta del quiosco escolar.';
+'Cabecera de ventas del quiosco escolar.';
 
 comment on table public.sale_items is
-'Lineas de productos vendidos por cierre diario. Guarda cantidad, precio y costo snapshot.';
+'Lineas de venta de productos o alimentos. Guarda cantidad, precio y costo snapshot.';

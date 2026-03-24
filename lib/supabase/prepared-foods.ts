@@ -10,6 +10,22 @@ export type PreparedFoodRecord = {
   created_at: string;
 };
 
+export type PreparedFoodOption = {
+  id: number;
+  nombre: string;
+  categoria: string;
+  costo_produccion: number | null;
+  precio_venta: number;
+  fecha_preparacion: string;
+};
+
+export type PreparedFoodSalesSummary = {
+  quantitySold: number;
+  totalRevenue: number;
+};
+
+export type PreparedFoodSalesMap = Record<number, PreparedFoodSalesSummary>;
+
 type PreparedFoodsQueryResult = {
   items: PreparedFoodRecord[];
   totalCount: number;
@@ -25,6 +41,19 @@ export type PreparedFoodsOverview = {
   tableMissing: boolean;
 };
 
+export type PreparedFoodSalesInsights = {
+  byFood: PreparedFoodSalesMap;
+  totalUnitsSold: number;
+  totalRevenue: number;
+  tableMissing: boolean;
+};
+
+type SaleItemAggregate = {
+  prepared_food_id: number | null;
+  quantity: number | string | null;
+  line_total: number | string | null;
+};
+
 function isMissingRelationError(code?: string | null) {
   return code === "42P01" || code === "42703" || code === "PGRST205";
 }
@@ -35,6 +64,19 @@ function getTodayDateString() {
   const month = String(now.getUTCMonth() + 1).padStart(2, "0");
   const day = String(now.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function toNumber(value: number | string | null | undefined) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
 }
 
 export async function getPreparedFoodsPage(
@@ -122,6 +164,90 @@ export async function getPreparedFoodsOverview(
       items.length > 0
         ? items.reduce((total, item) => total + item.precio_venta, 0) / items.length
         : 0,
+    tableMissing: false,
+  };
+}
+
+export async function getPreparedFoodOptions(
+  supabase: SupabaseClient
+): Promise<{ items: PreparedFoodOption[]; tableMissing: boolean }> {
+  const response = await supabase
+    .from("prepared_foods")
+    .select("id, nombre, categoria, costo_produccion, precio_venta, fecha_preparacion")
+    .order("fecha_preparacion", { ascending: false })
+    .order("nombre", { ascending: true });
+
+  const typedResponse = response as PostgrestSingleResponse<PreparedFoodOption[]>;
+
+  if (isMissingRelationError(typedResponse.error?.code)) {
+    return {
+      items: [],
+      tableMissing: true,
+    };
+  }
+
+  if (typedResponse.error) {
+    throw typedResponse.error;
+  }
+
+  return {
+    items: typedResponse.data ?? [],
+    tableMissing: false,
+  };
+}
+
+export async function getPreparedFoodSalesInsights(
+  supabase: SupabaseClient
+): Promise<PreparedFoodSalesInsights> {
+  const response = await supabase
+    .from("sale_items")
+    .select("prepared_food_id, quantity, line_total")
+    .not("prepared_food_id", "is", null);
+
+  const typedResponse = response as PostgrestSingleResponse<SaleItemAggregate[]>;
+
+  if (isMissingRelationError(typedResponse.error?.code)) {
+    return {
+      byFood: {},
+      totalUnitsSold: 0,
+      totalRevenue: 0,
+      tableMissing: true,
+    };
+  }
+
+  if (typedResponse.error) {
+    throw typedResponse.error;
+  }
+
+  const byFood: PreparedFoodSalesMap = {};
+  let totalUnitsSold = 0;
+  let totalRevenue = 0;
+
+  for (const item of typedResponse.data ?? []) {
+    if (item.prepared_food_id == null) {
+      continue;
+    }
+
+    const quantitySold = toNumber(item.quantity);
+    const revenue = toNumber(item.line_total);
+    const current = byFood[item.prepared_food_id] ?? {
+      quantitySold: 0,
+      totalRevenue: 0,
+    };
+
+    byFood[item.prepared_food_id] = {
+      quantitySold: current.quantitySold + quantitySold,
+      totalRevenue: current.totalRevenue + revenue,
+    };
+
+    totalUnitsSold += quantitySold;
+    totalRevenue += revenue;
+  }
+
+  return {
+    byFood,
+    totalUnitsSold,
+    totalRevenue,
     tableMissing: false,
   };
 }

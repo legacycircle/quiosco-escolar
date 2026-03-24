@@ -5,6 +5,7 @@ import { FoodsTable } from "@/components/foods/foods-table";
 import {
   getPreparedFoodsOverview,
   getPreparedFoodsPage,
+  getPreparedFoodSalesInsights,
 } from "@/lib/supabase/prepared-foods";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -70,9 +71,11 @@ export default async function FoodsPage({ searchParams }: FoodsPageProps) {
   const [
     { items, totalCount, tableMissing },
     { totalRecords, todayRecords, withCostCount, withoutCostCount, averageSalePrice },
+    { byFood: salesByFood },
   ] = await Promise.all([
     getPreparedFoodsPage(supabase, currentPage, pageSize),
     getPreparedFoodsOverview(supabase),
+    getPreparedFoodSalesInsights(supabase),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -103,7 +106,11 @@ export default async function FoodsPage({ searchParams }: FoodsPageProps) {
         </div>
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <MetricCard label="Registros" value={String(totalRecords)} detail={tableMissing ? "Tabla pendiente" : `Items visibles: ${totalCount}`} />
+          <MetricCard
+            label="Registros"
+            value={String(totalRecords)}
+            detail={tableMissing ? "Tabla pendiente" : `Items visibles: ${totalCount}`}
+          />
           <MetricCard label="Preparados hoy" value={String(todayRecords)} />
           <MetricCard label="Con costo visible" value={String(withCostCount)} />
           <MetricCard label="Sin costo visible" value={String(withoutCostCount)} />
@@ -123,6 +130,7 @@ export default async function FoodsPage({ searchParams }: FoodsPageProps) {
         totalCount={totalCount}
         firstItem={firstItem}
         lastItem={lastItem}
+        salesByFood={salesByFood}
       />
     </>
   );

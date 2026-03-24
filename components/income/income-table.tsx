@@ -1,4 +1,4 @@
-import type { IncomeLineRecord } from "@/lib/supabase/income";
+﻿import type { IncomeLineRecord } from "@/lib/supabase/income";
 
 type IncomeTableProps = {
   items: IncomeLineRecord[];
@@ -62,10 +62,11 @@ export function IncomeTable({
 
       <div className="mt-4 overflow-hidden rounded-[1.25rem] border border-[#eadcd2] bg-[#fffdfa]">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] border-collapse">
+          <table className="w-full min-w-[1040px] border-collapse">
             <thead>
               <tr className="bg-[#f6ede7] text-left text-[0.88rem] font-semibold text-[color:var(--brand-dark)]">
-                <th className="px-4 py-1.5">Producto</th>
+                <th className="px-4 py-1.5">Nombre</th>
+                <th className="px-4 py-1.5">Tipo</th>
                 <th className="px-4 py-1.5 text-right">Fecha</th>
                 <th className="px-4 py-1.5 text-right">Precio</th>
                 <th className="px-4 py-1.5 text-right">Unidades</th>
@@ -82,7 +83,8 @@ export function IncomeTable({
                       key={item.id}
                       className="border-t border-[#f1e4db] bg-white text-[0.92rem] text-[color:var(--brand-dark)]"
                     >
-                      <td className="px-4 py-1.5 font-semibold">{item.productName}</td>
+                      <td className="px-4 py-1.5 font-semibold">{item.itemName}</td>
+                      <td className="px-4 py-1.5 capitalize">{item.itemType}</td>
                       <td className="px-4 py-1.5 text-right">{formatShortDate(item.saleDate)}</td>
                       <td className="px-4 py-1.5 text-right">{formatCurrency(item.unitPrice)}</td>
                       <td className="px-4 py-1.5 text-right">{item.quantity}</td>
@@ -103,6 +105,7 @@ export function IncomeTable({
                           : "Sin ingresos"
                         : ""}
                     </td>
+                    <td className="px-4 py-1.5">&nbsp;</td>
                     <td className="px-4 py-1.5 text-right">&nbsp;</td>
                     <td className="px-4 py-1.5 text-right">&nbsp;</td>
                     <td className="px-4 py-1.5 text-right">&nbsp;</td>

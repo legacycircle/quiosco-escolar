@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { RevenueActions } from "@/components/income/revenue-actions";
 import { IncomeTable } from "@/components/income/income-table";
 import { getIncomeOverview, getIncomePage } from "@/lib/supabase/income";
+import { getPreparedFoodOptions } from "@/lib/supabase/prepared-foods";
 import { getAllProductOptions } from "@/lib/supabase/products";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -69,10 +70,12 @@ export default async function RevenuePage({ searchParams }: RevenuePageProps) {
     { items, totalCount, tableMissing },
     { totalSales, currentMonthSales, itemsSold, lineCount },
     { items: productOptions, tableMissing: productsTableMissing },
+    { items: foodOptions, tableMissing: foodsTableMissing },
   ] = await Promise.all([
     getIncomePage(supabase, currentPage, pageSize),
     getIncomeOverview(supabase),
     getAllProductOptions(supabase),
+    getPreparedFoodOptions(supabase),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -82,6 +85,7 @@ export default async function RevenuePage({ searchParams }: RevenuePageProps) {
   }
 
   const activeProducts = productOptions.filter((item) => item.is_active);
+  const availableCatalog = activeProducts.length + foodOptions.length;
   const firstItem = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const lastItem = totalCount === 0 ? 0 : firstItem + items.length - 1;
 
@@ -94,7 +98,7 @@ export default async function RevenuePage({ searchParams }: RevenuePageProps) {
               Ingresos
             </h1>
             <p className="mt-1.5 max-w-2xl text-sm text-[color:var(--brand-mid)] sm:text-base">
-              Registra una venta por vez usando productos reales y calculo automatico del total al momento de guardar.
+              Registra ventas de productos o alimentos con busqueda rapida, unidades y calculo automatico del total.
             </p>
           </div>
         </div>
@@ -119,16 +123,26 @@ export default async function RevenuePage({ searchParams }: RevenuePageProps) {
             detail={tableMissing ? "Sin historial todavia" : `Pagina actual: ${currentPage}`}
           />
           <MetricCard
-            label="Productos activos"
-            value={String(activeProducts.length)}
-            detail={productsTableMissing ? "Tabla products pendiente" : "Base lista para sugerencias"}
+            label="Catalogo disponible"
+            value={String(availableCatalog)}
+            detail={
+              productsTableMissing && foodsTableMissing
+                ? "Tablas products y prepared_foods pendientes"
+                : productsTableMissing
+                  ? "Solo alimentos disponibles"
+                  : foodsTableMissing
+                    ? "Solo productos disponibles"
+                    : "Productos y alimentos listos para sugerencias"
+            }
           />
         </section>
       </section>
 
       <RevenueActions
         productOptions={productOptions}
+        foodOptions={foodOptions}
         productsTableMissing={productsTableMissing}
+        foodsTableMissing={foodsTableMissing}
       />
 
       <IncomeTable

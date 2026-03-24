@@ -1,8 +1,11 @@
-import type { PostgrestSingleResponse, SupabaseClient } from "@supabase/supabase-js";
+﻿import type { PostgrestSingleResponse, SupabaseClient } from "@supabase/supabase-js";
+
+export type IncomeItemType = "producto" | "alimento";
 
 export type IncomeLineRecord = {
   id: number;
-  productName: string;
+  itemName: string;
+  itemType: IncomeItemType;
   saleDate: string;
   unitPrice: number;
   quantity: number;
@@ -32,6 +35,7 @@ type SaleItemRow = {
   created_at: string;
   sales: { sale_date: string } | { sale_date: string }[] | null;
   products: { nombre: string } | { nombre: string }[] | null;
+  prepared_foods: { nombre: string } | { nombre: string }[] | null;
 };
 
 function isMissingRelationError(code?: string | null) {
@@ -70,7 +74,7 @@ export async function getIncomePage(
   const response = await supabase
     .from("sale_items")
     .select(
-      "id, quantity, unit_price_snapshot, line_total, created_at, sales!inner(sale_date), products!inner(nombre)",
+      "id, quantity, unit_price_snapshot, line_total, created_at, sales!inner(sale_date), products(nombre), prepared_foods(nombre)",
       { count: "exact" }
     )
     .order("created_at", { ascending: false })
@@ -95,10 +99,14 @@ export async function getIncomePage(
   const items = (typedResponse.data ?? []).map((item) => {
     const sale = unwrapRelation(item.sales);
     const product = unwrapRelation(item.products);
+    const preparedFood = unwrapRelation(item.prepared_foods);
+    const resolvedType: IncomeItemType = preparedFood ? "alimento" : "producto";
+    const resolvedName = preparedFood?.nombre ?? product?.nombre ?? "Item";
 
     return {
       id: item.id,
-      productName: product?.nombre ?? "Producto",
+      itemName: resolvedName,
+      itemType: resolvedType,
       saleDate: sale?.sale_date ?? "",
       unitPrice: toNumber(item.unit_price_snapshot),
       quantity: toNumber(item.quantity),

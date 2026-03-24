@@ -8,9 +8,12 @@ import {
   parsePositiveInteger,
 } from "@/lib/decimal";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import type { PreparedFoodOption } from "@/lib/supabase/prepared-foods";
 import type { ProductOption } from "@/lib/supabase/products";
 
 type Tone = "danger" | "success";
+type SaleKind = "product" | "food";
+type PriceSource = "catalog" | "manual";
 
 type Feedback = {
   tone: Tone;
@@ -21,7 +24,9 @@ type Feedback = {
 
 type RevenueActionsProps = {
   productOptions: ProductOption[];
+  foodOptions: PreparedFoodOption[];
   productsTableMissing: boolean;
+  foodsTableMissing: boolean;
 };
 
 type FormState = {
@@ -31,7 +36,10 @@ type FormState = {
   total: string;
 };
 
-type PriceSource = "product" | "manual";
+type SelectedRef = {
+  kind: SaleKind;
+  id: number;
+} | null;
 
 function getTodayIsoDate() {
   const now = new Date();
@@ -39,6 +47,14 @@ function getTodayIsoDate() {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getInitialSaleKind(productsTableMissing: boolean, foodsTableMissing: boolean): SaleKind {
+  if (!productsTableMissing) {
+    return "product";
+  }
+
+  return "food";
 }
 
 function normalizeName(value: string) {
@@ -60,6 +76,19 @@ function formatCurrency(value: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+function formatShortDate(value: string) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("es-PE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
 }
 
 function multiplyDecimalStringByInteger(value: string, quantity: number) {
@@ -97,13 +126,36 @@ function getProductCostString(product: ProductOption | null) {
   );
 }
 
+function getFoodPriceString(food: PreparedFoodOption | null) {
+  if (!food) {
+    return "";
+  }
+
+  return normalizeOptionalDecimalString(String(food.precio_venta)) ?? String(food.precio_venta);
+}
+
+function getFoodCostString(food: PreparedFoodOption | null) {
+  if (!food || food.costo_produccion == null) {
+    return "0";
+  }
+
+  return (
+    normalizeOptionalDecimalString(String(food.costo_produccion), { scale: 8 }) ??
+    String(food.costo_produccion)
+  );
+}
+
 function formatSaveError(message: string) {
   const normalized = message.toLowerCase();
 
-  if (normalized.includes("relation") && (normalized.includes("sales") || normalized.includes("sale_items"))) {
+  if (
+    normalized.includes("prepared_food_id") ||
+    normalized.includes("prepared_foods") ||
+    (normalized.includes("relation") && (normalized.includes("sales") || normalized.includes("sale_items")))
+  ) {
     return buildFeedback(
-      "Tablas pendientes",
-      "Faltan las tablas sales o sale_items en Supabase. Ejecuta primero el SQL de ingresos.",
+      "Migracion pendiente",
+      "Falta ejecutar el SQL de integracion entre ingresos y alimentos en Supabase.",
       message
     );
   }
@@ -149,17 +201,26 @@ function initialForm(): FormState {
   };
 }
 
-export function RevenueActions({ productOptions, productsTableMissing }: RevenueActionsProps) {
+export function RevenueActions({
+  productOptions,
+  foodOptions,
+  productsTableMissing,
+  foodsTableMissing,
+}: RevenueActionsProps) {
   const router = useRouter();
   const activeProducts = useMemo(
     () => productOptions.filter((item) => item.is_active),
     [productOptions]
   );
+  const [saleKind, setSaleKind] = useState<SaleKind>(() =>
+    getInitialSaleKind(productsTableMissing, foodsTableMissing)
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [isNameFocused, setIsNameFocused] = useState(false);
   const [form, setForm] = useState<FormState>(initialForm);
+  const [selectedRef, setSelectedRef] = useState<SelectedRef>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const [priceSource, setPriceSource] = useState<PriceSource>("product");
+  const [priceSource, setPriceSource] = useState<PriceSource>("catalog");
   const [isCalculatingTotal, setIsCalculatingTotal] = useState(false);
   const [isPending, startTransition] = useTransition();
   const deferredName = useDeferredValue(form.nombre);
@@ -177,15 +238,41 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
     };
   }, [isOpen]);
 
-  const selectedProduct = useMemo(() => {
+  const exactProductMatches = useMemo(() => {
     const normalized = normalizeName(form.nombre);
 
     if (!normalized) {
-      return null;
+      return [] as ProductOption[];
     }
 
-    return activeProducts.find((item) => normalizeName(item.nombre) === normalized) ?? null;
+    return activeProducts.filter((item) => normalizeName(item.nombre) === normalized);
   }, [activeProducts, form.nombre]);
+
+  const exactFoodMatches = useMemo(() => {
+    const normalized = normalizeName(form.nombre);
+
+    if (!normalized) {
+      return [] as PreparedFoodOption[];
+    }
+
+    return foodOptions.filter((item) => normalizeName(item.nombre) === normalized);
+  }, [foodOptions, form.nombre]);
+
+  const selectedProduct = useMemo(() => {
+    if (selectedRef?.kind === "product") {
+      return activeProducts.find((item) => item.id === selectedRef.id) ?? null;
+    }
+
+    return exactProductMatches.length === 1 ? exactProductMatches[0] : null;
+  }, [activeProducts, exactProductMatches, selectedRef]);
+
+  const selectedFood = useMemo(() => {
+    if (selectedRef?.kind === "food") {
+      return foodOptions.find((item) => item.id === selectedRef.id) ?? null;
+    }
+
+    return exactFoodMatches.length === 1 ? exactFoodMatches[0] : null;
+  }, [exactFoodMatches, foodOptions, selectedRef]);
 
   const matchedProducts = useMemo(() => {
     const normalized = normalizeName(deferredName);
@@ -199,12 +286,29 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
       .slice(0, 6);
   }, [activeProducts, deferredName]);
 
+  const matchedFoods = useMemo(() => {
+    const normalized = normalizeName(deferredName);
+
+    if (!normalized) {
+      return [] as PreparedFoodOption[];
+    }
+
+    return foodOptions
+      .filter((item) => normalizeName(item.nombre).includes(normalized))
+      .slice(0, 6);
+  }, [deferredName, foodOptions]);
+
+  const selectedCatalog = saleKind === "product" ? selectedProduct : selectedFood;
+
   useEffect(() => {
-    if (priceSource !== "product") {
+    if (priceSource !== "catalog") {
       return;
     }
 
-    const defaultPrice = getProductPriceString(selectedProduct);
+    const defaultPrice =
+      saleKind === "product"
+        ? getProductPriceString(selectedProduct)
+        : getFoodPriceString(selectedFood);
 
     setForm((current) => {
       if (current.precio === defaultPrice) {
@@ -216,7 +320,7 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
         precio: defaultPrice,
       };
     });
-  }, [priceSource, selectedProduct]);
+  }, [priceSource, saleKind, selectedFood, selectedProduct]);
 
   useEffect(() => {
     const quantity = parsePositiveInteger(form.unidades);
@@ -253,19 +357,22 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
   }, [form.precio, form.unidades]);
 
   const openModal = () => {
-    if (productsTableMissing) {
+    if (productsTableMissing && foodsTableMissing) {
       setFeedback(
         buildFeedback(
-          "Tabla pendiente",
-          "La tabla products no existe todavia en Supabase, asi que no se pueden registrar ventas."
+          "Tablas pendientes",
+          "Necesitas products o prepared_foods disponibles para registrar ingresos."
         )
       );
       return;
     }
 
+    const initialKind = getInitialSaleKind(productsTableMissing, foodsTableMissing);
     setFeedback(null);
+    setSaleKind(initialKind);
     setForm(initialForm());
-    setPriceSource("product");
+    setSelectedRef(null);
+    setPriceSource("catalog");
     setIsNameFocused(false);
     setIsOpen(true);
   };
@@ -275,30 +382,63 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
     setIsNameFocused(false);
   };
 
+  const handleKindChange = (kind: SaleKind) => {
+    setSaleKind(kind);
+    setForm(initialForm());
+    setSelectedRef(null);
+    setPriceSource("catalog");
+    setIsNameFocused(false);
+    setFeedback(null);
+  };
+
   const handlePickProduct = (product: ProductOption) => {
     setForm((current) => ({
       ...current,
       nombre: product.nombre,
       precio: getProductPriceString(product),
     }));
-    setPriceSource("product");
+    setSelectedRef({ kind: "product", id: product.id });
+    setPriceSource("catalog");
+    setIsNameFocused(false);
+  };
+
+  const handlePickFood = (food: PreparedFoodOption) => {
+    setForm((current) => ({
+      ...current,
+      nombre: food.nombre,
+      precio: getFoodPriceString(food),
+    }));
+    setSelectedRef({ kind: "food", id: food.id });
+    setPriceSource("catalog");
     setIsNameFocused(false);
   };
 
   const handleSubmit = () => {
-    if (!selectedProduct) {
-      setFeedback(
-        buildFeedback(
-          "Producto obligatorio",
-          "Escribe y selecciona un producto valido desde las coincidencias antes de guardar."
-        )
-      );
+    if (saleKind === "product" && productsTableMissing) {
+      setFeedback(buildFeedback("Tabla pendiente", "La tabla products no existe todavia en Supabase."));
+      return;
+    }
+
+    if (saleKind === "food" && foodsTableMissing) {
+      setFeedback(buildFeedback("Tabla pendiente", "La tabla prepared_foods no existe todavia en Supabase."));
       return;
     }
 
     const quantity = parsePositiveInteger(form.unidades);
     const price = normalizeDecimalString(form.precio, { allowZero: false });
     const total = quantity ? multiplyDecimalStringByInteger(form.precio, quantity) : null;
+    const selectedItem = saleKind === "product" ? selectedProduct : selectedFood;
+    const itemLabel = saleKind === "product" ? "producto" : "alimento";
+
+    if (!selectedItem) {
+      setFeedback(
+        buildFeedback(
+          saleKind === "product" ? "Producto obligatorio" : "Alimento obligatorio",
+          `Escribe y selecciona un ${itemLabel} valido desde las coincidencias antes de guardar.`
+        )
+      );
+      return;
+    }
 
     if (!quantity) {
       setFeedback(buildFeedback("Unidades invalidas", "Las unidades vendidas deben ser enteros positivos."));
@@ -334,10 +474,14 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
 
           const itemInsert = await supabase.from("sale_items").insert({
             sale_id: saleInsert.data.id as number,
-            product_id: selectedProduct.id,
+            product_id: saleKind === "product" ? selectedProduct?.id ?? null : null,
+            prepared_food_id: saleKind === "food" ? selectedFood?.id ?? null : null,
             quantity,
             unit_price_snapshot: price,
-            unit_cost_snapshot: getProductCostString(selectedProduct),
+            unit_cost_snapshot:
+              saleKind === "product"
+                ? getProductCostString(selectedProduct)
+                : getFoodCostString(selectedFood),
             line_total: total,
           });
 
@@ -347,11 +491,12 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
           }
 
           setForm(initialForm());
+          setSelectedRef(null);
           closeModal();
           setFeedback(
             buildFeedback(
               "Venta registrada",
-              `Se guardo ${selectedProduct.nombre} con ${quantity} unidades por ${formatCurrency(Number(total))}.`,
+              `Se guardo ${selectedItem.nombre} como ${itemLabel} con ${quantity} unidades por ${formatCurrency(Number(total))}.`,
               undefined,
               "success"
             )
@@ -364,6 +509,9 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
       })();
     });
   };
+
+  const isProductDisabled = productsTableMissing;
+  const isFoodDisabled = foodsTableMissing;
 
   return (
     <div className="space-y-3">
@@ -412,8 +560,42 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
                   handleSubmit();
                 }}
               >
+                <div className="md:col-span-2 space-y-2">
+                  <span className="text-sm font-semibold text-[color:var(--brand-dark)]">Registrar ingreso de</span>
+                  <div className="grid grid-cols-2 gap-2 rounded-[1.2rem] border border-[#eadcd2] bg-[#fcfaf8] p-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleKindChange("product")}
+                      disabled={isProductDisabled}
+                      className={[
+                        "inline-flex min-h-11 items-center justify-center rounded-[0.95rem] px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-55",
+                        saleKind === "product"
+                          ? "bg-[color:var(--brand-dark)] text-white"
+                          : "bg-transparent text-[color:var(--brand-dark)] hover:bg-white",
+                      ].join(" ")}
+                    >
+                      Producto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleKindChange("food")}
+                      disabled={isFoodDisabled}
+                      className={[
+                        "inline-flex min-h-11 items-center justify-center rounded-[0.95rem] px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-55",
+                        saleKind === "food"
+                          ? "bg-[color:var(--brand-dark)] text-white"
+                          : "bg-transparent text-[color:var(--brand-dark)] hover:bg-white",
+                      ].join(" ")}
+                    >
+                      Alimento
+                    </button>
+                  </div>
+                </div>
+
                 <label className="relative block space-y-2 md:col-span-2">
-                  <span className="text-sm font-semibold text-[color:var(--brand-dark)]">Producto</span>
+                  <span className="text-sm font-semibold text-[color:var(--brand-dark)]">
+                    {saleKind === "product" ? "Producto" : "Alimento"}
+                  </span>
                   <input
                     value={form.nombre}
                     onFocus={() => setIsNameFocused(true)}
@@ -422,15 +604,20 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
                     }}
                     onChange={(event) => {
                       setForm((current) => ({ ...current, nombre: event.target.value }));
-                      setPriceSource("product");
+                      setSelectedRef(null);
+                      setPriceSource("catalog");
                     }}
                     type="text"
-                    placeholder="Escribe para buscar un producto"
+                    placeholder={
+                      saleKind === "product"
+                        ? "Escribe para buscar un producto"
+                        : "Escribe para buscar un alimento"
+                    }
                     className="h-11 w-full rounded-xl border border-[#e7ddd6] bg-white px-4 text-sm text-[color:var(--brand-dark)] outline-none transition placeholder:text-[color:var(--brand-mid)]/60 focus:border-[color:var(--accent)] focus:ring-4 focus:ring-[rgba(209,7,84,0.12)]"
                     autoComplete="off"
                   />
 
-                  {isNameFocused && normalizeName(form.nombre) && matchedProducts.length > 0 ? (
+                  {saleKind === "product" && isNameFocused && normalizeName(form.nombre) && matchedProducts.length > 0 ? (
                     <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-20 overflow-hidden rounded-[1.2rem] border border-[#eadcd2] bg-white shadow-[0_18px_40px_rgba(22,36,61,0.12)]">
                       {matchedProducts.map((product) => (
                         <button
@@ -450,6 +637,32 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
                           </span>
                           <span className="text-xs font-semibold text-[color:var(--brand-mid)]">
                             {product.precio_venta == null ? "Sin precio" : formatCurrency(product.precio_venta)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {saleKind === "food" && isNameFocused && normalizeName(form.nombre) && matchedFoods.length > 0 ? (
+                    <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-20 overflow-hidden rounded-[1.2rem] border border-[#eadcd2] bg-white shadow-[0_18px_40px_rgba(22,36,61,0.12)]">
+                      {matchedFoods.map((food) => (
+                        <button
+                          key={food.id}
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => handlePickFood(food)}
+                          className="flex w-full items-center justify-between gap-3 border-b border-[#f3e8e0] px-4 py-3 text-left transition last:border-b-0 hover:bg-[#fcf5ef]"
+                        >
+                          <span>
+                            <span className="block text-sm font-semibold text-[color:var(--brand-dark)]">
+                              {food.nombre}
+                            </span>
+                            <span className="mt-1 block text-xs text-[color:var(--brand-mid)]">
+                              {food.categoria} | Fecha: {formatShortDate(food.fecha_preparacion)}
+                            </span>
+                          </span>
+                          <span className="text-xs font-semibold text-[color:var(--brand-mid)]">
+                            {formatCurrency(food.precio_venta)}
                           </span>
                         </button>
                       ))}
@@ -484,7 +697,7 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
                     }}
                     type="text"
                     inputMode="decimal"
-                    placeholder={selectedProduct?.precio_venta == null ? "0.00" : "Precio de venta"}
+                    placeholder={selectedCatalog ? "Precio de venta" : "0.00"}
                     className="h-11 w-full rounded-xl border border-[#e7ddd6] bg-white px-4 text-sm text-[color:var(--brand-dark)] outline-none transition placeholder:text-[color:var(--brand-mid)]/60 focus:border-[color:var(--accent)] focus:ring-4 focus:ring-[rgba(209,7,84,0.12)]"
                   />
                 </label>
@@ -510,17 +723,19 @@ export function RevenueActions({ productOptions, productsTableMissing }: Revenue
 
                 <div className="md:col-span-2 rounded-[1.2rem] border border-[#efe3da] bg-[#fcfaf8] px-4 py-3 text-sm text-[color:var(--brand-mid)]">
                   <p className="font-semibold text-[color:var(--brand-dark)]">
-                    {selectedProduct ? selectedProduct.nombre : "Selecciona un producto desde las coincidencias"}
+                    {selectedCatalog ? selectedCatalog.nombre : "Selecciona un item desde las coincidencias"}
                   </p>
                   <p className="mt-1">
-                    {selectedProduct
-                      ? selectedProduct.precio_venta == null
-                        ? "Este producto no tiene precio de venta en /productos, asi que puedes escribirlo manualmente."
-                        : `Precio sugerido desde /productos: ${formatCurrency(selectedProduct.precio_venta)}`
+                    {selectedCatalog
+                      ? saleKind === "product"
+                        ? selectedProduct?.precio_venta == null
+                          ? "Este producto no tiene precio de venta en /productos, asi que puedes escribirlo manualmente."
+                          : `Precio sugerido desde /productos: ${formatCurrency(selectedProduct.precio_venta)}`
+                        : `Precio sugerido desde /alimentos: ${formatCurrency(selectedFood?.precio_venta ?? 0)}`
                       : "Si no escribes nada, no se mostrara ninguna sugerencia."}
                   </p>
                   <p className="mt-2 text-xs">
-                    La venta se guardara directamente con la fecha de hoy.
+                    La venta se guardara directamente con la fecha de hoy en la tabla de ingresos.
                   </p>
                 </div>
 
