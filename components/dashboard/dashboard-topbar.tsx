@@ -9,6 +9,7 @@ type IconName =
   | "dashboard"
   | "gastos"
   | "ingresos"
+  | "alimentos"
   | "productos"
   | "proveedores"
   | "bancos"
@@ -25,6 +26,7 @@ const menuItems: MenuItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
   { label: "Gastos", href: "/gastos", icon: "gastos" },
   { label: "Ingresos", href: "/ingresos", icon: "ingresos" },
+  { label: "Alimentos", href: "/alimentos", icon: "alimentos" },
   { label: "Productos", href: "/productos", icon: "productos" },
   { label: "Proveedores", href: "/proveedores", icon: "proveedores" },
   { label: "Cuentas", href: "/cuentas", icon: "bancos" },
@@ -64,6 +66,14 @@ function MenuIcon({ name }: { name: IconName }) {
         <svg {...commonProps}>
           <path d="M4 18h16" />
           <path d="m6 15 4-4 3 3 5-6" />
+        </svg>
+      );
+    case "alimentos":
+      return (
+        <svg {...commonProps}>
+          <path d="M4 11h16" />
+          <path d="M6 11a6 6 0 0 0 12 0" />
+          <path d="M12 17v3" />
         </svg>
       );
     case "productos":
@@ -139,7 +149,7 @@ export function DashboardTopbar({ userLabel, activeLabel }: DashboardTopbarProps
               QUIOSCO
             </p>
             <p className="mt-0.5 text-[0.64rem] font-semibold uppercase tracking-[0.26em] text-[color:var(--brand-mid)] sm:text-[0.68rem]">
-              Gestión escolar
+              Gestion escolar
             </p>
           </div>
 

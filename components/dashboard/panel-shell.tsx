@@ -8,6 +8,7 @@ const labelByPrefix = [
   { prefix: "/dashboard", label: "Dashboard" },
   { prefix: "/gastos", label: "Gastos" },
   { prefix: "/ingresos", label: "Ingresos" },
+  { prefix: "/alimentos", label: "Alimentos" },
   { prefix: "/productos", label: "Productos" },
   { prefix: "/proveedores", label: "Proveedores" },
   { prefix: "/cuentas", label: "Cuentas" },
